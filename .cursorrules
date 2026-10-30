@@ -1,0 +1,24 @@
+# Cursor Rules — Проект «Белый Король» (White King / Zugzwang)
+# Движок: Godot 4.7 Forward+ (GDScript 2.0)
+# Формат: 72-часовой Game Jam (3 программиста)
+
+# 1. Архитектура: Signal Bus (EventBus Autoload)
+- Любое межмодульное взаимодействие должно осуществляться ТОЛЬКО через синглтон EventBus (res://scripts/event_bus.gd).
+- Запрещены прямые ссылки ($Node, get_node) между сценами шахмат, бункера и аудио/UI.
+- Dev 1 работает в: scenes/chess/, scripts/chess/
+- Dev 2 работает в: scenes/bunker/, scenes/player/, scripts/world/
+- Dev 3 работает в: scenes/ui/, scenes/effects/, shaders/, assets/audio/
+
+# 2. Стандарты GDScript 2.0
+- Всегда используй строгую статическую типизацию:
+  var piece_type: String = "pawn"
+  func calculate_moves(from: Vector2i) -> Array[Vector2i]:
+- Для твинов используй create_tween(), убивай предыдущий твин, если он ещё валиден.
+- Обработку ввода делай в _unhandled_input(event). В _physics_process только физика передвижения.
+
+# 3. Godot MCP Server
+- Используй Godot MCP сервер для проверки синтаксиса (validate_script) и проверки консоли ошибок (get_errors).
+
+# 4. GDD & Документация
+- Всегда сверяйся с docs/GDD.md и AGENTS.md перед внесением изменений в игровую механику.
+

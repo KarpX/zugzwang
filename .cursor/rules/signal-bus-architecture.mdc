@@ -1,0 +1,30 @@
+---
+description: Signal Bus (EventBus) Architecture & Git Conflict Prevention
+globs: **/*.gd, **/*.tscn
+alwaysApply: true
+---
+
+# Signal Bus Architecture & Zero-Git-Conflict Protocol
+
+1. **No Cross-Module Node References**:
+   - Never reference `$../Node` or `get_node()` across module boundaries.
+   - Modules:
+     - `Dev 1`: `scenes/chess/`, `scripts/chess/`
+     - `Dev 2`: `scenes/bunker/`, `scenes/player/`, `scripts/world/`
+     - `Dev 3`: `scenes/ui/`, `scenes/effects/`, `shaders/`, `assets/audio/`
+
+2. **EventBus Interface**:
+   - The singleton `EventBus` (`res://scripts/event_bus.gd`) is the single source of truth for cross-module communication.
+   - Primary signals:
+     - `piece_moved(from_pos: Vector2i, to_pos: Vector2i)`
+     - `piece_captured(piece_type: String, is_white: bool)`
+     - `game_over(winner: String)`
+     - `player_made_action()`
+     - `escalation_stage_changed(stage: int, total_losses: int)`
+     - `door_knock_triggered(knock_level: int)`
+     - `camera_mode_changed(is_board_mode: bool)`
+
+3. **Composite Main Scene**:
+   - `scenes/room.tscn` simply instances the isolated subscenes.
+   - Do not edit shared scene files while working on specific sub-features.
+
