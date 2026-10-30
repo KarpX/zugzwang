@@ -30,7 +30,7 @@
 │                    EventBus (Autoload)                      │
 │                   res://scripts/event_bus.gd                │
 └───────▲─────────────────────▲─────────────────────▲─────────┘
-        │                     │                     │
+		│                     │                     │
 ┌───────┴─────────────┐┌──────┴─────────────┐┌──────┴─────────┐
 │     Dev 1: Chess    ││    Dev 2: Bunker   ││  Dev 3: Audio  │
 │  - scenes/chess/    ││  - scenes/bunker/  ││  - scenes/ui/  │
@@ -73,26 +73,26 @@
 
 1. **Строгая статическая типизация**:
    - Все переменные и возвращаемые значения функций должны иметь тип:
-     ```gdscript
-     var board_pos: Vector2i = Vector2i.ZERO
-     func make_move(from_pos: Vector2i, to_pos: Vector2i) -> bool:
-     ```
+	 ```gdscript
+	 var board_pos: Vector2i = Vector2i.ZERO
+	 func make_move(from_pos: Vector2i, to_pos: Vector2i) -> bool:
+	 ```
 2. **Экспорт параметров для геймдизайна**:
    - Используйте `@export`, `@export_range`, `@export_enum`:
-     ```gdscript
-     @export_range(1.0, 20.0, 0.5) var move_speed: float = 7.0
-     @export var idle_knock_intervals: Array[float] = [25.0, 45.0, 60.0]
-     ```
+	 ```gdscript
+	 @export_range(1.0, 20.0, 0.5) var move_speed: float = 7.0
+	 @export var idle_knock_intervals: Array[float] = [25.0, 45.0, 60.0]
+	 ```
 3. **Безопасная работа с Tween (Godot 4)**:
    - Всегда проверяйте или перезаписывайте активный твин:
-     ```gdscript
-     var _move_tween: Tween = null
-     func animate_piece(target_pos: Vector3) -> void:
-         if _move_tween and _move_tween.is_valid():
-             _move_tween.kill()
-         _move_tween = create_tween().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-         _move_tween.tween_property(self, "global_position", target_pos, 0.4)
-     ```
+	 ```gdscript
+	 var _move_tween: Tween = null
+	 func animate_piece(target_pos: Vector3) -> void:
+		 if _move_tween and _move_tween.is_valid():
+			 _move_tween.kill()
+		 _move_tween = create_tween().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		 _move_tween.tween_property(self, "global_position", target_pos, 0.4)
+	 ```
 4. **Не засоряйте `_process` и `_physics_process`**:
    - В `_physics_process` — только расчет движения `CharacterBody3D` (`move_and_slide()`).
    - Все события должны быть реактивными (сигналы, таймеры, `_unhandled_input`), а не проверяться каждый кадр через `if`.
@@ -168,4 +168,3 @@ feat(bunker): добавлен DoorKnockTimer на 25/45/60 секунд
 feat(audio): добавлены звуки скрежета фигур и стука в стальную дверь
 refactor(bus): обновлен payload сигнала escalation_stage_changed
 ```
-

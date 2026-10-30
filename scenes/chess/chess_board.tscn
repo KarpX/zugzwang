@@ -1,0 +1,17 @@
+[gd_scene format=3 uid="uid://vbbrscmec1l0"]
+
+[ext_resource type="Script" uid="uid://bl81y7vbap87c" path="res://scripts/chess/chess_board_view.gd" id="1_cbv"]
+[ext_resource type="ArrayMesh" uid="uid://cjxv7daa7bp0c" path="res://assets/obj/bord.obj" id="2_bord"]
+
+[node name="ChessBoard" type="Node3D" unique_id=67175096]
+script = ExtResource("1_cbv")
+
+[node name="Bord" type="MeshInstance3D" parent="." unique_id=1159060821]
+mesh = ExtResource("2_bord")
+
+[node name="Pieces" type="Node3D" parent="." unique_id=2073502457]
+
+[node name="Highlights" type="Node3D" parent="." unique_id=415848958]
+
+[node name="CameraPoint" type="Marker3D" parent="." unique_id=243966015]
+transform = Transform3D(1, 0, 0, 0, 0.700507, 0.713646, 0, -0.713646, 0.700507, -2.731, 3.9611838, 0.7096242)

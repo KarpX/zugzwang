@@ -3,6 +3,9 @@
 [ext_resource type="ArrayMesh" uid="uid://vby8rcdeokm4" path="res://assets/obj/wall.obj" id="1_ffxv4"]
 [ext_resource type="ArrayMesh" uid="uid://dvckkxtjwhf5y" path="res://assets/obj/floor.obj" id="2_85yof"]
 [ext_resource type="Script" uid="uid://civp1exok25hc" path="res://scenes/player.gd" id="3_85yof"]
+[ext_resource type="ArrayMesh" uid="uid://bx4h6i2qwxn85" path="res://assets/obj/table.obj" id="4_14vil"]
+[ext_resource type="AudioStream" uid="uid://cgaxltonkbg6" path="res://assets/sounds/steps.ogg" id="4_jn645"]
+[ext_resource type="PackedScene" uid="uid://vbbrscmec1l0" path="res://scenes/chess/chess_board.tscn" id="5_board"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_x5vg1"]
 size = Vector3(40.07849, 13.515747, 0.60009766)
@@ -43,6 +46,9 @@ emission_energy_multiplier = 3.0
 material = SubResource("StandardMaterial3D_x5vg1")
 radius = 0.15
 height = 0.3
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_5vh7c"]
+size = Vector3(4.996704, 5.402466, 4.8352737)
 
 [node name="room" type="Node3D" unique_id=1060219468]
 
@@ -109,6 +115,14 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.080068, 0)
 current = true
 fov = 70.0
 
+[node name="PlayerSteps" type="AudioStreamPlayer3D" parent="player" unique_id=590910055]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -4.3939867, -1.2548888)
+stream = ExtResource("4_jn645")
+unit_size = 5.0
+max_db = 1.0
+max_distance = 12.0
+bus = &"Sound"
+
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1804770691]
 environment = SubResource("Environment_m4ky1")
 
@@ -118,9 +132,22 @@ light_color = Color(0.93666875, 1, 0.6907517, 1)
 light_energy = 1.796
 light_bake_mode = 1
 shadow_enabled = true
-omni_range = 15.265398
+omni_range = 15.455645
 omni_attenuation = 1.5
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="OmniLight3D" unique_id=1404448631]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.0117788315, 0)
 mesh = SubResource("SphereMesh_m4ky1")
+
+[node name="TableStatic" type="StaticBody3D" parent="." unique_id=1486369480]
+
+[node name="Table" type="MeshInstance3D" parent="TableStatic" unique_id=1970914707]
+transform = Transform3D(0.8, 0, 0, 0, 0.8, 0, 0, 0, 0.8, 16, 0, 20)
+mesh = ExtResource("4_14vil")
+
+[node name="ChessBoard" parent="TableStatic/Table" unique_id=21915507 groups=["chess_board"] instance=ExtResource("5_board")]
+transform = Transform3D(-0.7, 0, -6.119594e-08, 0, 0.7, 0, 6.119594e-08, 0, -0.7, -1.8481598, 5.6, -1.751934)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="TableStatic" unique_id=1298941691]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.009525, 2.201233, 20.009485)
+shape = SubResource("BoxShape3D_5vh7c")
