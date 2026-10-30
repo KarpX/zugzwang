@@ -102,6 +102,7 @@ func _physics_process(delta: float) -> void:
 		velocity.x = move_toward(velocity.x, 0, speed)
 		velocity.z = move_toward(velocity.z, 0, speed)
 		move_and_slide()
+		_update_footsteps(Vector2.ZERO)
 		return
 
 	# Перемещение WASD
@@ -116,6 +117,23 @@ func _physics_process(delta: float) -> void:
 		velocity.z = move_toward(velocity.z, 0, speed)
 
 	move_and_slide()
+	_update_footsteps(input_dir)
+
+## Обновление звука шагов: играет при движении и останавливается при остановке
+func _update_footsteps(input_dir: Vector2) -> void:
+	if player_steps == null:
+		return
+	
+	var has_input: bool = not input_dir.is_zero_approx()
+	var horizontal_speed_sq: float = Vector2(velocity.x, velocity.z).length_squared()
+	var is_moving: bool = can_walk and is_on_floor() and has_input and (horizontal_speed_sq > 0.1)
+	
+	if is_moving:
+		if not player_steps.playing:
+			player_steps.play()
+	else:
+		if player_steps.playing:
+			player_steps.stop()
 
 ## Плавный переход камеры за шахматный стол
 func enter_board_mode() -> void:
@@ -135,6 +153,8 @@ func enter_board_mode() -> void:
 	is_board_mode = true
 	can_walk = false
 	can_move = false
+	if player_steps != null and player_steps.playing:
+		player_steps.stop()
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	if _hud_prompt != null:
 		_hud_prompt.text = "[E] / [Esc] Встать из-за стола"
