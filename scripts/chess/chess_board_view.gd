@@ -12,7 +12,18 @@ const ORIGIN_X: float = -4.735
 const ORIGIN_Z: float = -0.473
 const STEP_X: float = 0.5724
 const STEP_Z: float = -0.5844
-const SURFACE_Y: float = 0.43
+
+@export_group("Параметры доски и высоты")
+## Высота основания фигур над доской (поверхность доски bord.obj = 0.40)
+@export_range(0.0, 1.5, 0.005) var surface_y: float = 0.405
+
+@export_group("Скорость перемещения фигур")
+## Длительность хода игрока (белые фигуры), секунды
+@export_range(0.1, 2.0, 0.05) var white_move_duration: float = 0.4
+## Длительность хода войны (черные фигуры, медленное зловещее скольжение со скрежетом)
+@export_range(0.5, 4.0, 0.1) var black_move_duration: float = 1.6
+## Задержка перед ходом ИИ черных, секунды
+@export_range(0.1, 3.0, 0.1) var ai_turn_delay: float = 0.8
 
 # Узел камеры для вида над доской
 @onready var camera_point: Marker3D = $CameraPoint
@@ -133,7 +144,7 @@ func _init_meshes() -> void:
 func cell_to_local_pos(cell: Vector2i) -> Vector3:
 	var x: float = ORIGIN_X + float(cell.x) * STEP_X
 	var z: float = ORIGIN_Z + float(cell.y) * STEP_Z
-	return Vector3(x, SURFACE_Y, z)
+	return Vector3(x, surface_y, z)
 
 ## Преобразование локальной точки пересечения в клетку доски
 func local_pos_to_cell(pos: Vector3) -> Vector2i:
@@ -163,13 +174,12 @@ func spawn_pieces() -> void:
 
 func _spawn_piece_at(pos: Vector2i, p_type: String, is_white: bool) -> ChessPiece3D:
 	var piece_node = ChessPiece3DScript.new()
-	pieces_container.add_child(piece_node)
-	
 	var mesh: Mesh = meshes.get(p_type, meshes["pawn"])
 	var mat: Material = white_mat if is_white else black_mat
-	piece_node.setup(p_type, is_white, pos, mesh, mat)
+	piece_node.setup(p_type, is_white, pos, mesh, mat, surface_y)
 	
 	piece_node.position = cell_to_local_pos(pos)
+	pieces_container.add_child(piece_node)
 	piece_nodes[pos] = piece_node
 	return piece_node
 
@@ -199,7 +209,7 @@ func _handle_board_click() -> void:
 	var ray_normal = camera.project_ray_normal(mouse_pos)
 	
 	# Плоскость поверхности доски в мировых координатах
-	var board_global_y: float = global_transform.origin.y + (SURFACE_Y * global_transform.basis.y.y)
+	var board_global_y: float = global_transform.origin.y + (surface_y * global_transform.basis.y.y)
 	if abs(ray_normal.y) < 0.0001:
 		return
 		
@@ -283,12 +293,12 @@ func _create_highlight_tile(cell: Vector2i, mat: Material, size: float) -> void:
 		
 	var tile = MeshInstance3D.new()
 	var quad = BoxMesh.new()
-	quad.size = Vector3(size, 0.02, size)
+	quad.size = Vector3(size, 0.005, size)
 	tile.mesh = quad
 	tile.material_override = mat
 	
 	var pos: Vector3 = cell_to_local_pos(cell)
-	pos.y += 0.015 # Чуть выше поверхности доски
+	pos.y += 0.003 # Тонкий маркер на поверхности доски
 	tile.position = pos
 	highlights_container.add_child(tile)
 
@@ -324,11 +334,11 @@ func _execute_player_move(from_pos: Vector2i, to_pos: Vector2i) -> void:
 		if bus:
 			bus.piece_captured.emit(move_res["captured_piece"], move_res["captured_is_white"])
 			
-	# Перемещение 3D-ноды
+	# Перемещение 3D-ноды (ход игрока белыми — дуговой перенос)
 	piece_nodes.erase(from_pos)
 	piece_nodes[to_pos] = piece_node
 	piece_node.board_pos = to_pos
-	piece_node.animate_to(to_global(cell_to_local_pos(to_pos)))
+	piece_node.animate_to(to_global(cell_to_local_pos(to_pos)), white_move_duration, false)
 	
 	if bus:
 		bus.piece_moved.emit(from_pos, to_pos)
@@ -339,29 +349,32 @@ func _execute_player_move(from_pos: Vector2i, to_pos: Vector2i) -> void:
 			bus.game_over.emit(logic.winner)
 		return
 		
-	# Ход ИИ (Черные) с атмосферной задержкой
+	# Ход ИИ (Черные) с атмосферной задержкой после завершения хода белых
 	is_ai_thinking = true
-	var timer = get_tree().create_timer(0.7)
+	var timer = get_tree().create_timer(white_move_duration + ai_turn_delay)
 	timer.timeout.connect(_execute_ai_turn)
 
 ## Ход ИИ войны
 func _execute_ai_turn() -> void:
-	is_ai_thinking = false
 	if logic.is_game_over or not is_inside_tree():
+		is_ai_thinking = false
 		return
 		
 	var ai_move = logic.get_best_ai_move()
 	if ai_move.is_empty():
+		is_ai_thinking = false
 		return
 		
 	var from_pos: Vector2i = ai_move["from"]
 	var to_pos: Vector2i = ai_move["to"]
 	var piece_node = piece_nodes.get(from_pos)
 	if not piece_node:
+		is_ai_thinking = false
 		return
 		
 	var move_res = logic.make_move(from_pos, to_pos)
 	if not move_res["success"]:
+		is_ai_thinking = false
 		return
 		
 	var bus = _get_event_bus()
@@ -369,21 +382,26 @@ func _execute_ai_turn() -> void:
 	if move_res["captured"]:
 		var victim_node = piece_nodes.get(to_pos)
 		if victim_node:
-			victim_node.animate_capture()
+			victim_node.animate_capture(black_move_duration * 0.5)
 			piece_nodes.erase(to_pos)
 			
 		if bus:
 			bus.piece_captured.emit(move_res["captured_piece"], move_res["captured_is_white"])
 			
-	# Перемещение черной фигуры
+	# Медленное скольжение черной фигуры строго по доске (для звука скрежета)
 	piece_nodes.erase(from_pos)
 	piece_nodes[to_pos] = piece_node
 	piece_node.board_pos = to_pos
-	piece_node.animate_to(to_global(cell_to_local_pos(to_pos)))
+	piece_node.animate_to(to_global(cell_to_local_pos(to_pos)), black_move_duration, true)
 	
 	if bus:
 		bus.piece_moved.emit(from_pos, to_pos)
 		
-	if move_res["is_checkmate"]:
-		if bus:
-			bus.game_over.emit(logic.winner)
+	# Разрешаем ход игроку только после того, как черная фигура закончит медленное скольжение
+	var finish_timer = get_tree().create_timer(black_move_duration)
+	finish_timer.timeout.connect(func():
+		is_ai_thinking = false
+		if move_res["is_checkmate"]:
+			if bus:
+				bus.game_over.emit(logic.winner)
+	)

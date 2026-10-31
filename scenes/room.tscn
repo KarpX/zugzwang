@@ -2,6 +2,7 @@
 
 [ext_resource type="ArrayMesh" uid="uid://vby8rcdeokm4" path="res://assets/obj/wall.obj" id="1_ffxv4"]
 [ext_resource type="ArrayMesh" uid="uid://dvckkxtjwhf5y" path="res://assets/obj/floor.obj" id="2_85yof"]
+[ext_resource type="ArrayMesh" uid="uid://bu2hmu1ispov0" path="res://assets/obj/door.obj" id="2_qvc4m"]
 [ext_resource type="Script" uid="uid://civp1exok25hc" path="res://scenes/player.gd" id="3_85yof"]
 [ext_resource type="ArrayMesh" uid="uid://bx4h6i2qwxn85" path="res://assets/obj/table.obj" id="4_14vil"]
 [ext_resource type="AudioStream" uid="uid://cgaxltonkbg6" path="res://assets/sounds/steps.ogg" id="4_jn645"]
@@ -86,6 +87,10 @@ shape = SubResource("BoxShape3D_x5vg1")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15.895996, 6.2578735, 40.293243)
 shape = SubResource("BoxShape3D_x5vg1")
 
+[node name="Door" type="MeshInstance3D" parent="walls" unique_id=1853457929]
+transform = Transform3D(0.8, 0, 0, 0, 0.8, 0, 0, 0, 0.8, 16, 0, 0)
+mesh = ExtResource("2_qvc4m")
+
 [node name="floor2" type="MeshInstance3D" parent="." unique_id=96282830]
 transform = Transform3D(5, 0, 0, 0, 1, 0, 0, 0, 6.5, 16, 12.502992, 20)
 mesh = ExtResource("2_85yof")
@@ -147,6 +152,7 @@ mesh = ExtResource("4_14vil")
 
 [node name="ChessBoard" parent="TableStatic/Table" unique_id=21915507 groups=["chess_board"] instance=ExtResource("5_board")]
 transform = Transform3D(-0.7, 0, -6.119594e-08, 0, 0.7, 0, 6.119594e-08, 0, -0.7, -1.8481598, 5.6, -1.751934)
+black_move_duration = 2.5
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="TableStatic" unique_id=1298941691]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.009525, 2.201233, 20.009485)
