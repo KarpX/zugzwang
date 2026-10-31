@@ -206,14 +206,11 @@ is_swinging = true
 [node name="OmniLight3D" type="OmniLight3D" parent="HangingBulb" unique_id=1332429521]
 transform = Transform3D(4, 0, 0, 0, 4, 0, 0, 0, 4, 0, -14.1, 0)
 light_color = Color(1, 0.9411765, 0.6627451, 1)
-<<<<<<< HEAD
-light_energy = 0.62
-=======
->>>>>>> 8dc6481f5925d25788a0db7968e67036adf00a26
+light_energy = 1.2
 light_bake_mode = 1
 shadow_enabled = true
 shadow_bias = 0.05
-omni_range = 12.728249
+omni_range = 22.0
 omni_attenuation = 1.2
 
 [node name="AudioStreamPlayer3D" type="AudioStreamPlayer3D" parent="HangingBulb" unique_id=1420703584]
@@ -234,13 +231,8 @@ material_override = ExtResource("10_tablemat")
 mesh = ExtResource("4_14vil")
 
 [node name="ChessBoard" parent="TableStatic/Table" unique_id=21915507 groups=["chess_board"] instance=ExtResource("5_board")]
-<<<<<<< HEAD
 transform = Transform3D(-0.7, 0, -6.119594e-08, 0, 0.7, 0, 6.119594e-08, 0, -0.7, -1.8477612, 5.6046634, -1.7485161)
-black_move_duration = 2.5
-=======
-transform = Transform3D(-0.7, 0, -6.119594e-08, 0, 0.7, 0, 6.119594e-08, 0, -0.7, -1.8481598, 5.6, -1.751934)
-black_move_duration = 1.2
->>>>>>> 8dc6481f5925d25788a0db7968e67036adf00a26
+black_move_duration = 1.6
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="TableStatic" unique_id=1298941691]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.009525, 2.201233, 20.009485)
