@@ -105,8 +105,10 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.332, 9.019, 2.05)
 mesh = ExtResource("3_7dqbv")
 
 [node name="CameraPivot" type="Node3D" parent="walls/CameraBase" unique_id=1142422552]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0.5)
+transform = Transform3D(-0.2576304, 0, -0.96624357, 0, 1, 0, 0.96624357, 0, -0.2576304, 0, 2, 0.5)
 script = ExtResource("6_seccam")
+tracking_speed = 3.0
+min_pitch_deg = 20.0
 
 [node name="CameraMesh" type="MeshInstance3D" parent="walls/CameraBase/CameraPivot" unique_id=1142422556]
 transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 0.2, -0.4, -1.2)
@@ -118,13 +120,12 @@ light_color = Color(1, 0.1, 0.1, 1)
 light_energy = 1.6
 light_volumetric_fog_energy = 3.0
 shadow_enabled = true
-distance_fade_enabled = true
 spot_range = 28.0
 spot_angle = 14.0
 spot_angle_attenuation = 1.8
 
 [node name="LensGlow" type="OmniLight3D" parent="walls/CameraBase/CameraPivot" unique_id=1142422554]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -2.35)
+transform = Transform3D(0.99999994, 0, 0, 0, 1, 0, 0, 0, 0.99999994, -0.007958412, 0, -2.3798468)
 light_color = Color(1, 0.05, 0.05, 1)
 light_energy = 0.8
 omni_range = 0.6
@@ -132,6 +133,7 @@ omni_attenuation = 2.5
 
 [node name="LensMesh" type="MeshInstance3D" parent="walls/CameraBase/CameraPivot" unique_id=1142422555]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -2.2467504)
+visible = false
 mesh = SubResource("SphereMesh_lens")
 
 [node name="floor2" type="MeshInstance3D" parent="." unique_id=96282830]
@@ -151,6 +153,7 @@ mesh = ExtResource("2_85yof")
 [node name="player" type="CharacterBody3D" parent="." unique_id=570902455 groups=["player"]]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 16, 5.185, 3.5)
 script = ExtResource("3_85yof")
+table_interact_distance = 5.0
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="player" unique_id=1069967162]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1.2216187, 0)
@@ -200,7 +203,6 @@ mesh = ExtResource("4_14vil")
 
 [node name="ChessBoard" parent="TableStatic/Table" unique_id=21915507 groups=["chess_board"] instance=ExtResource("5_board")]
 transform = Transform3D(-0.7, 0, -6.119594e-08, 0, 0.7, 0, 6.119594e-08, 0, -0.7, -1.8481598, 5.6, -1.751934)
-black_move_duration = 2.5
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="TableStatic" unique_id=1298941691]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.009525, 2.201233, 20.009485)
