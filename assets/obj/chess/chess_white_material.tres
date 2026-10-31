@@ -5,8 +5,8 @@
 [resource]
 resource_name = "chess_white_material"
 cull_mode = 0
+diffuse_mode = 2
 albedo_texture = ExtResource("1_tex")
-metallic = 0.02
-metallic_specular = 0.5
-roughness = 0.35
+metallic_specular = 0.25
+roughness = 0.68
 texture_filter = 0

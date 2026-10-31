@@ -4,6 +4,8 @@
 
 [resource]
 resource_name = "table_material"
+cull_mode = 0
 albedo_texture = ExtResource("1_tex")
-roughness = 0.5
+metallic_specular = 0.20
+roughness = 0.78
 texture_filter = 0

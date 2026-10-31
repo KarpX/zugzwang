@@ -19,6 +19,7 @@ var _hover_tween: Tween = null
 var _is_selected: bool = false
 
 func _ready() -> void:
+	scale = Vector3(0.8, 0.8, 0.8)
 	if position.y != 0.0:
 		base_y = position.y
 	if mesh_instance == null:
@@ -26,6 +27,7 @@ func _ready() -> void:
 
 ## Инициализация фигуры и выравнивание основания меша по нулевой плоскости
 func setup(type: String, white: bool, pos: Vector2i, piece_mesh: Mesh, piece_mat: Material, surface_height: float = 0.405) -> void:
+	scale = Vector3(0.8, 0.8, 0.8)
 	piece_type = type
 	is_white = white
 	board_pos = pos
