@@ -225,22 +225,14 @@ func enter_board_mode() -> void:
 		var start_origin: Vector3 = start_trans.origin
 		var target_origin: Vector3 = cam_marker.global_position
 		
-		# Интерполируем yaw и pitch независимо, строго удерживая roll = 0.
-		# Это полностью исключает крен и заваливание горизонта при подходе к столу с любой стороны.
+		# Интерполируем yaw и pitch в одной плавной траектории напрямую в точку CameraPoint (roll строго = 0)
 		var start_euler: Vector3 = start_trans.basis.orthonormalized().get_euler(EULER_ORDER_YXZ)
 		var target_euler: Vector3 = cam_marker.global_transform.basis.orthonormalized().get_euler(EULER_ORDER_YXZ)
 		
 		var start_yaw: float = start_euler.y
-		var target_yaw: float = target_euler.y
 		var diff_yaw: float = wrapf(target_euler.y - start_euler.y, -PI, PI)
 		var start_pitch: float = start_euler.x
 		var target_pitch: float = target_euler.x
-		
-		if head == null:
-			head = get_node_or_null("head")
-		if head != null:
-			_cam_tween.tween_property(head, "rotation:x", 0.0, 0.75)
-		_cam_tween.tween_property(self, "rotation:y", rotation.y + diff_yaw, 0.75)
 		
 		_cam_tween.tween_method(func(t: float):
 			var cur_origin: Vector3 = start_origin.lerp(target_origin, t)
@@ -249,6 +241,10 @@ func enter_board_mode() -> void:
 			var cur_basis: Basis = Basis.from_euler(Vector3(cur_pitch, cur_yaw, 0.0), EULER_ORDER_YXZ)
 			camera.global_transform = Transform3D(cur_basis, cur_origin)
 		, 0.0, 1.0, 0.75)
+		_cam_tween.chain().tween_callback(func():
+			if camera != null and cam_marker != null and is_instance_valid(cam_marker):
+				camera.global_transform = cam_marker.global_transform
+		)
 	
 	var bus = _get_event_bus()
 	if bus:
