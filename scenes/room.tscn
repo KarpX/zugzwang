@@ -19,6 +19,7 @@
 [ext_resource type="Material" uid="uid://cambasemat01" path="res://assets/obj/camera_base_material.tres" id="11_cambasemat"]
 [ext_resource type="Material" uid="uid://cammaterial01" path="res://assets/obj/camera_material.tres" id="12_cammat"]
 [ext_resource type="AudioStream" uid="uid://d35f8fhkj4urh" path="res://assets/sounds/bulb_ambient.ogg" id="15_katsu"]
+[ext_resource type="Script" uid="uid://bfjdrebj064ye" path="res://scripts/world/door_knock_timer.gd" id="16_door"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_x5vg1"]
 size = Vector3(40.07849, 13.515747, 0.60009766)
@@ -104,6 +105,14 @@ shape = SubResource("BoxShape3D_x5vg1")
 [node name="Door" type="MeshInstance3D" parent="walls" unique_id=1853457929]
 transform = Transform3D(0.8, 0, 0, 0, 0.8, 0, 0, 0, 0.8, 16, 0, 0)
 mesh = ExtResource("2_qvc4m")
+script = ExtResource("16_door")
+
+[node name="KnockAudioPlayer" type="AudioStreamPlayer3D" parent="walls/Door" unique_id=1853457930]
+transform = Transform3D(1.25, 0, 0, 0, 1.25, 0, 0, 0, 1.25, 0, 7.8387523, 0)
+volume_db = 15.0
+unit_size = 20.0
+max_distance = 60.0
+bus = &"Sound"
 
 [node name="CameraBase" type="MeshInstance3D" parent="walls" unique_id=1965094053]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.332, 9.019, 2.05)
@@ -147,7 +156,7 @@ mesh = SubResource("SphereMesh_lens")
 [node name="CameraSound" type="AudioStreamPlayer3D" parent="walls/CameraBase/CameraPivot" unique_id=1643142000]
 transform = Transform3D(0.99999994, 0, 0, 0, 1, 0, 0, 0, 0.99999994, 0.04675913, 0, -0.09361696)
 stream = ExtResource("8_jxwrd")
-volume_db = -15.0
+volume_db = -20.0
 unit_size = 12.0
 max_db = 2.0
 max_distance = 60.0
@@ -231,7 +240,10 @@ mesh = ExtResource("4_14vil")
 
 [node name="ChessBoard" parent="TableStatic/Table" unique_id=21915507 groups=["chess_board"] instance=ExtResource("5_board")]
 transform = Transform3D(-0.7, 0, -6.119594e-08, 0, 0.7, 0, 6.119594e-08, 0, -0.7, -1.8481598, 5.6, -1.751934)
+surface_y = null
+white_move_duration = null
 black_move_duration = 1.2
+ai_turn_delay = null
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="TableStatic" unique_id=1298941691]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.009525, 2.201233, 20.009485)

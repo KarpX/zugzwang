@@ -5,7 +5,7 @@
 [ext_resource type="Material" uid="uid://bordmat001" path="res://assets/obj/bord_material.tres" id="3_bordmat"]
 [ext_resource type="Script" uid="uid://c682g71fco3ly" path="res://scripts/chess/chess_piece_3d.gd" id="4_cp3d"]
 [ext_resource type="Material" uid="uid://dxki4854us6vc" path="res://assets/obj/chess/chess_white_material.tres" id="5_wmat"]
-[ext_resource type="Material" uid="uid://chessblackmat01" path="res://assets/obj/chess/chess_black_material.tres" id="6_bmat"]
+[ext_resource type="Material" uid="uid://dxjv80obus6vc" path="res://assets/obj/chess/chess_black_material.tres" id="6_bmat"]
 [ext_resource type="ArrayMesh" uid="uid://cuj3k5tpa7f7x" path="res://assets/obj/chess/pawn_white.obj" id="7_pawn_w"]
 [ext_resource type="ArrayMesh" uid="uid://cur5dw2ie5ncf" path="res://assets/obj/chess/rook_white.obj" id="8_rook_w"]
 [ext_resource type="ArrayMesh" uid="uid://bv4gxoqcsg81x" path="res://assets/obj/chess/knight_white.obj" id="9_knight_w"]
@@ -18,6 +18,9 @@
 [ext_resource type="ArrayMesh" uid="uid://bsbs5m12jkjc2" path="res://assets/obj/chess/bishop_black.obj" id="16_bishop_b"]
 [ext_resource type="ArrayMesh" uid="uid://byx0lh6i56o70" path="res://assets/obj/chess/queen_black.obj" id="17_queen_b"]
 [ext_resource type="ArrayMesh" uid="uid://ix2rl1s7t1y5" path="res://assets/obj/chess/king_black.obj" id="18_king_b"]
+[ext_resource type="AudioStream" uid="uid://d2dsb5ce3gg0r" path="res://assets/sounds/chess_player_turn.ogg" id="19_plturn"]
+[ext_resource type="AudioStream" uid="uid://dondl8vscrpks" path="res://assets/sounds/chess_enemy_turn.ogg" id="20_enturn"]
+[ext_resource type="AudioStream" uid="uid://clnrlkod5ab8k" path="res://assets/sounds/chess_capture.wav" id="21_capt"]
 
 [node name="ChessBoard" type="Node3D" unique_id=67175096]
 script = ExtResource("1_cbv")
@@ -29,396 +32,328 @@ mesh = ExtResource("2_bord")
 [node name="BoardLight" type="OmniLight3D" parent="." unique_id=987162541]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.731, 2.8, -2.518)
 light_color = Color(1, 0.95, 0.85, 1)
-light_energy = 1.0
-omni_range = 5.0
 omni_attenuation = 1.2
-shadow_enabled = false
 
 [node name="Pieces" type="Node3D" parent="." unique_id=2073502457]
 
-[node name="White_Rook_A1" type="Node3D" parent="Pieces"]
+[node name="White_Rook_A1" type="Node3D" parent="Pieces" unique_id=1573680837]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.735, 0.405, -0.473)
 script = ExtResource("4_cp3d")
 piece_type = "rook"
-is_white = true
-board_pos = Vector2i(0, 0)
-base_y = 0.405
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/White_Rook_A1"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/White_Rook_A1" unique_id=811326983]
 material_override = ExtResource("5_wmat")
 mesh = ExtResource("8_rook_w")
 
-[node name="White_Knight_B1" type="Node3D" parent="Pieces"]
+[node name="White_Knight_B1" type="Node3D" parent="Pieces" unique_id=1629135226]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.1626, 0.405, -0.473)
 script = ExtResource("4_cp3d")
 piece_type = "knight"
-is_white = true
 board_pos = Vector2i(1, 0)
-base_y = 0.405
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/White_Knight_B1"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/White_Knight_B1" unique_id=1614995420]
 transform = Transform3D(-1, 0, -8.74228e-08, 0, 1, 0, 8.74228e-08, 0, -1, 0, 0, 0)
 material_override = ExtResource("5_wmat")
 mesh = ExtResource("9_knight_w")
 
-[node name="White_Bishop_C1" type="Node3D" parent="Pieces"]
+[node name="White_Bishop_C1" type="Node3D" parent="Pieces" unique_id=862799502]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.5902, 0.405, -0.473)
 script = ExtResource("4_cp3d")
 piece_type = "bishop"
-is_white = true
 board_pos = Vector2i(2, 0)
-base_y = 0.405
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/White_Bishop_C1"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/White_Bishop_C1" unique_id=1135716965]
 material_override = ExtResource("5_wmat")
 mesh = ExtResource("10_bishop_w")
 
-[node name="White_Queen_D1" type="Node3D" parent="Pieces"]
+[node name="White_Queen_D1" type="Node3D" parent="Pieces" unique_id=510489509]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.0178, 0.405, -0.473)
 script = ExtResource("4_cp3d")
 piece_type = "queen"
-is_white = true
 board_pos = Vector2i(3, 0)
-base_y = 0.405
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/White_Queen_D1"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/White_Queen_D1" unique_id=225838957]
 material_override = ExtResource("5_wmat")
 mesh = ExtResource("11_queen_w")
 
-[node name="White_King_E1" type="Node3D" parent="Pieces"]
+[node name="White_King_E1" type="Node3D" parent="Pieces" unique_id=985352792]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.4454, 0.405, -0.473)
 script = ExtResource("4_cp3d")
 piece_type = "king"
-is_white = true
 board_pos = Vector2i(4, 0)
-base_y = 0.405
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/White_King_E1"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/White_King_E1" unique_id=685703129]
 material_override = ExtResource("5_wmat")
 mesh = ExtResource("12_king_w")
 
-[node name="White_Bishop_F1" type="Node3D" parent="Pieces"]
+[node name="White_Bishop_F1" type="Node3D" parent="Pieces" unique_id=1342640165]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.873, 0.405, -0.473)
 script = ExtResource("4_cp3d")
 piece_type = "bishop"
-is_white = true
 board_pos = Vector2i(5, 0)
-base_y = 0.405
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/White_Bishop_F1"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/White_Bishop_F1" unique_id=293912872]
 material_override = ExtResource("5_wmat")
 mesh = ExtResource("10_bishop_w")
 
-[node name="White_Knight_G1" type="Node3D" parent="Pieces"]
+[node name="White_Knight_G1" type="Node3D" parent="Pieces" unique_id=609030124]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.3006, 0.405, -0.473)
 script = ExtResource("4_cp3d")
 piece_type = "knight"
-is_white = true
 board_pos = Vector2i(6, 0)
-base_y = 0.405
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/White_Knight_G1"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/White_Knight_G1" unique_id=2026571417]
 transform = Transform3D(-1, 0, -8.74228e-08, 0, 1, 0, 8.74228e-08, 0, -1, 0, 0, 0)
 material_override = ExtResource("5_wmat")
 mesh = ExtResource("9_knight_w")
 
-[node name="White_Rook_H1" type="Node3D" parent="Pieces"]
+[node name="White_Rook_H1" type="Node3D" parent="Pieces" unique_id=1844178016]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.7282, 0.405, -0.473)
 script = ExtResource("4_cp3d")
 piece_type = "rook"
-is_white = true
 board_pos = Vector2i(7, 0)
-base_y = 0.405
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/White_Rook_H1"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/White_Rook_H1" unique_id=1879384955]
 material_override = ExtResource("5_wmat")
 mesh = ExtResource("8_rook_w")
 
-[node name="White_Pawn_A2" type="Node3D" parent="Pieces"]
+[node name="White_Pawn_A2" type="Node3D" parent="Pieces" unique_id=1480613355]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.735, 0.405, -1.0574)
 script = ExtResource("4_cp3d")
-piece_type = "pawn"
-is_white = true
 board_pos = Vector2i(0, 1)
-base_y = 0.405
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/White_Pawn_A2"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/White_Pawn_A2" unique_id=1168178028]
 material_override = ExtResource("5_wmat")
 mesh = ExtResource("7_pawn_w")
 
-[node name="White_Pawn_B2" type="Node3D" parent="Pieces"]
+[node name="White_Pawn_B2" type="Node3D" parent="Pieces" unique_id=294091672]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.1626, 0.405, -1.0574)
 script = ExtResource("4_cp3d")
-piece_type = "pawn"
-is_white = true
 board_pos = Vector2i(1, 1)
-base_y = 0.405
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/White_Pawn_B2"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/White_Pawn_B2" unique_id=2133057166]
 material_override = ExtResource("5_wmat")
 mesh = ExtResource("7_pawn_w")
 
-[node name="White_Pawn_C2" type="Node3D" parent="Pieces"]
+[node name="White_Pawn_C2" type="Node3D" parent="Pieces" unique_id=1059016099]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.5902, 0.405, -1.0574)
 script = ExtResource("4_cp3d")
-piece_type = "pawn"
-is_white = true
 board_pos = Vector2i(2, 1)
-base_y = 0.405
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/White_Pawn_C2"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/White_Pawn_C2" unique_id=1038877351]
 material_override = ExtResource("5_wmat")
 mesh = ExtResource("7_pawn_w")
 
-[node name="White_Pawn_D2" type="Node3D" parent="Pieces"]
+[node name="White_Pawn_D2" type="Node3D" parent="Pieces" unique_id=597631366]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.0178, 0.405, -1.0574)
 script = ExtResource("4_cp3d")
-piece_type = "pawn"
-is_white = true
 board_pos = Vector2i(3, 1)
-base_y = 0.405
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/White_Pawn_D2"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/White_Pawn_D2" unique_id=1402125252]
 material_override = ExtResource("5_wmat")
 mesh = ExtResource("7_pawn_w")
 
-[node name="White_Pawn_E2" type="Node3D" parent="Pieces"]
+[node name="White_Pawn_E2" type="Node3D" parent="Pieces" unique_id=904425902]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.4454, 0.405, -1.0574)
 script = ExtResource("4_cp3d")
-piece_type = "pawn"
-is_white = true
 board_pos = Vector2i(4, 1)
-base_y = 0.405
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/White_Pawn_E2"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/White_Pawn_E2" unique_id=1722497418]
 material_override = ExtResource("5_wmat")
 mesh = ExtResource("7_pawn_w")
 
-[node name="White_Pawn_F2" type="Node3D" parent="Pieces"]
+[node name="White_Pawn_F2" type="Node3D" parent="Pieces" unique_id=142038868]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.873, 0.405, -1.0574)
 script = ExtResource("4_cp3d")
-piece_type = "pawn"
-is_white = true
 board_pos = Vector2i(5, 1)
-base_y = 0.405
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/White_Pawn_F2"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/White_Pawn_F2" unique_id=425508794]
 material_override = ExtResource("5_wmat")
 mesh = ExtResource("7_pawn_w")
 
-[node name="White_Pawn_G2" type="Node3D" parent="Pieces"]
+[node name="White_Pawn_G2" type="Node3D" parent="Pieces" unique_id=166352090]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.3006, 0.405, -1.0574)
 script = ExtResource("4_cp3d")
-piece_type = "pawn"
-is_white = true
 board_pos = Vector2i(6, 1)
-base_y = 0.405
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/White_Pawn_G2"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/White_Pawn_G2" unique_id=351728858]
 material_override = ExtResource("5_wmat")
 mesh = ExtResource("7_pawn_w")
 
-[node name="White_Pawn_H2" type="Node3D" parent="Pieces"]
+[node name="White_Pawn_H2" type="Node3D" parent="Pieces" unique_id=338749435]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.7282, 0.405, -1.0574)
 script = ExtResource("4_cp3d")
-piece_type = "pawn"
-is_white = true
 board_pos = Vector2i(7, 1)
-base_y = 0.405
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/White_Pawn_H2"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/White_Pawn_H2" unique_id=852127959]
 material_override = ExtResource("5_wmat")
 mesh = ExtResource("7_pawn_w")
 
-[node name="Black_Pawn_A7" type="Node3D" parent="Pieces"]
+[node name="Black_Pawn_A7" type="Node3D" parent="Pieces" unique_id=944834740]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.735, 0.405, -3.9794)
 script = ExtResource("4_cp3d")
-piece_type = "pawn"
 is_white = false
 board_pos = Vector2i(0, 6)
-base_y = 0.405
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/Black_Pawn_A7"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/Black_Pawn_A7" unique_id=1735106535]
 material_override = ExtResource("6_bmat")
 mesh = ExtResource("13_pawn_b")
 
-[node name="Black_Pawn_B7" type="Node3D" parent="Pieces"]
+[node name="Black_Pawn_B7" type="Node3D" parent="Pieces" unique_id=1564624208]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.1626, 0.405, -3.9794)
 script = ExtResource("4_cp3d")
-piece_type = "pawn"
 is_white = false
 board_pos = Vector2i(1, 6)
-base_y = 0.405
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/Black_Pawn_B7"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/Black_Pawn_B7" unique_id=49762928]
 material_override = ExtResource("6_bmat")
 mesh = ExtResource("13_pawn_b")
 
-[node name="Black_Pawn_C7" type="Node3D" parent="Pieces"]
+[node name="Black_Pawn_C7" type="Node3D" parent="Pieces" unique_id=720274001]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.5902, 0.405, -3.9794)
 script = ExtResource("4_cp3d")
-piece_type = "pawn"
 is_white = false
 board_pos = Vector2i(2, 6)
-base_y = 0.405
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/Black_Pawn_C7"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/Black_Pawn_C7" unique_id=2081001512]
 material_override = ExtResource("6_bmat")
 mesh = ExtResource("13_pawn_b")
 
-[node name="Black_Pawn_D7" type="Node3D" parent="Pieces"]
+[node name="Black_Pawn_D7" type="Node3D" parent="Pieces" unique_id=365148174]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.0178, 0.405, -3.9794)
 script = ExtResource("4_cp3d")
-piece_type = "pawn"
 is_white = false
 board_pos = Vector2i(3, 6)
-base_y = 0.405
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/Black_Pawn_D7"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/Black_Pawn_D7" unique_id=704718076]
 material_override = ExtResource("6_bmat")
 mesh = ExtResource("13_pawn_b")
 
-[node name="Black_Pawn_E7" type="Node3D" parent="Pieces"]
+[node name="Black_Pawn_E7" type="Node3D" parent="Pieces" unique_id=1125822900]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.4454, 0.405, -3.9794)
 script = ExtResource("4_cp3d")
-piece_type = "pawn"
 is_white = false
 board_pos = Vector2i(4, 6)
-base_y = 0.405
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/Black_Pawn_E7"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/Black_Pawn_E7" unique_id=636103643]
 material_override = ExtResource("6_bmat")
 mesh = ExtResource("13_pawn_b")
 
-[node name="Black_Pawn_F7" type="Node3D" parent="Pieces"]
+[node name="Black_Pawn_F7" type="Node3D" parent="Pieces" unique_id=2067888377]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.873, 0.405, -3.9794)
 script = ExtResource("4_cp3d")
-piece_type = "pawn"
 is_white = false
 board_pos = Vector2i(5, 6)
-base_y = 0.405
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/Black_Pawn_F7"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/Black_Pawn_F7" unique_id=828165298]
 material_override = ExtResource("6_bmat")
 mesh = ExtResource("13_pawn_b")
 
-[node name="Black_Pawn_G7" type="Node3D" parent="Pieces"]
+[node name="Black_Pawn_G7" type="Node3D" parent="Pieces" unique_id=1918954467]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.3006, 0.405, -3.9794)
 script = ExtResource("4_cp3d")
-piece_type = "pawn"
 is_white = false
 board_pos = Vector2i(6, 6)
-base_y = 0.405
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/Black_Pawn_G7"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/Black_Pawn_G7" unique_id=1003359626]
 material_override = ExtResource("6_bmat")
 mesh = ExtResource("13_pawn_b")
 
-[node name="Black_Pawn_H7" type="Node3D" parent="Pieces"]
+[node name="Black_Pawn_H7" type="Node3D" parent="Pieces" unique_id=1272111416]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.7282, 0.405, -3.9794)
 script = ExtResource("4_cp3d")
-piece_type = "pawn"
 is_white = false
 board_pos = Vector2i(7, 6)
-base_y = 0.405
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/Black_Pawn_H7"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/Black_Pawn_H7" unique_id=900922903]
 material_override = ExtResource("6_bmat")
 mesh = ExtResource("13_pawn_b")
 
-[node name="Black_Rook_A8" type="Node3D" parent="Pieces"]
+[node name="Black_Rook_A8" type="Node3D" parent="Pieces" unique_id=1864277009]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.735, 0.405, -4.5638)
 script = ExtResource("4_cp3d")
 piece_type = "rook"
 is_white = false
 board_pos = Vector2i(0, 7)
-base_y = 0.405
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/Black_Rook_A8"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/Black_Rook_A8" unique_id=2047452894]
 material_override = ExtResource("6_bmat")
 mesh = ExtResource("14_rook_b")
 
-[node name="Black_Knight_B8" type="Node3D" parent="Pieces"]
+[node name="Black_Knight_B8" type="Node3D" parent="Pieces" unique_id=34576633]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.1626, 0.405, -4.5638)
 script = ExtResource("4_cp3d")
 piece_type = "knight"
 is_white = false
 board_pos = Vector2i(1, 7)
-base_y = 0.405
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/Black_Knight_B8"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/Black_Knight_B8" unique_id=379326231]
 material_override = ExtResource("6_bmat")
 mesh = ExtResource("15_knight_b")
 
-[node name="Black_Bishop_C8" type="Node3D" parent="Pieces"]
+[node name="Black_Bishop_C8" type="Node3D" parent="Pieces" unique_id=1963405477]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.5902, 0.405, -4.5638)
 script = ExtResource("4_cp3d")
 piece_type = "bishop"
 is_white = false
 board_pos = Vector2i(2, 7)
-base_y = 0.405
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/Black_Bishop_C8"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/Black_Bishop_C8" unique_id=1804245514]
 material_override = ExtResource("6_bmat")
 mesh = ExtResource("16_bishop_b")
 
-[node name="Black_Queen_D8" type="Node3D" parent="Pieces"]
+[node name="Black_Queen_D8" type="Node3D" parent="Pieces" unique_id=2035338594]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.0178, 0.405, -4.5638)
 script = ExtResource("4_cp3d")
 piece_type = "queen"
 is_white = false
 board_pos = Vector2i(3, 7)
-base_y = 0.405
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/Black_Queen_D8"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/Black_Queen_D8" unique_id=589562394]
 material_override = ExtResource("6_bmat")
 mesh = ExtResource("17_queen_b")
 
-[node name="Black_King_E8" type="Node3D" parent="Pieces"]
+[node name="Black_King_E8" type="Node3D" parent="Pieces" unique_id=1540817410]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.4454, 0.405, -4.5638)
 script = ExtResource("4_cp3d")
 piece_type = "king"
 is_white = false
 board_pos = Vector2i(4, 7)
-base_y = 0.405
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/Black_King_E8"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/Black_King_E8" unique_id=1226573152]
 material_override = ExtResource("6_bmat")
 mesh = ExtResource("18_king_b")
 
-[node name="Black_Bishop_F8" type="Node3D" parent="Pieces"]
+[node name="Black_Bishop_F8" type="Node3D" parent="Pieces" unique_id=906623089]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.873, 0.405, -4.5638)
 script = ExtResource("4_cp3d")
 piece_type = "bishop"
 is_white = false
 board_pos = Vector2i(5, 7)
-base_y = 0.405
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/Black_Bishop_F8"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/Black_Bishop_F8" unique_id=430275653]
 material_override = ExtResource("6_bmat")
 mesh = ExtResource("16_bishop_b")
 
-[node name="Black_Knight_G8" type="Node3D" parent="Pieces"]
+[node name="Black_Knight_G8" type="Node3D" parent="Pieces" unique_id=1316498478]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.3006, 0.405, -4.5638)
 script = ExtResource("4_cp3d")
 piece_type = "knight"
 is_white = false
 board_pos = Vector2i(6, 7)
-base_y = 0.405
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/Black_Knight_G8"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/Black_Knight_G8" unique_id=996896047]
 material_override = ExtResource("6_bmat")
 mesh = ExtResource("15_knight_b")
 
-[node name="Black_Rook_H8" type="Node3D" parent="Pieces"]
+[node name="Black_Rook_H8" type="Node3D" parent="Pieces" unique_id=804053950]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.7282, 0.405, -4.5638)
 script = ExtResource("4_cp3d")
 piece_type = "rook"
 is_white = false
 board_pos = Vector2i(7, 7)
-base_y = 0.405
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/Black_Rook_H8"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Pieces/Black_Rook_H8" unique_id=308293953]
 material_override = ExtResource("6_bmat")
 mesh = ExtResource("14_rook_b")
 
@@ -426,3 +361,33 @@ mesh = ExtResource("14_rook_b")
 
 [node name="CameraPoint" type="Marker3D" parent="." unique_id=243966015]
 transform = Transform3D(1, 0, 0, 0, 0.700507, 0.713646, 0, -0.713646, 0.700507, -2.731, 3.9611838, 0.7096242)
+
+[node name="PlayerTurnSound" type="AudioStreamPlayer3D" parent="." unique_id=293847101]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.731, 0.405, -2.518)
+stream = ExtResource("19_plturn")
+unit_size = 5.0
+max_distance = 40.0
+bus = &"Sound"
+
+[node name="EnemyTurnSound" type="AudioStreamPlayer3D" parent="." unique_id=293847102]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.731, 0.405, -2.518)
+stream = ExtResource("20_enturn")
+volume_db = -16.0
+unit_size = 5.0
+max_distance = 40.0
+bus = &"Sound"
+
+[node name="CaptureSound" type="AudioStreamPlayer3D" parent="." unique_id=293847103]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.731, 0.405, -2.518)
+stream = ExtResource("21_capt")
+unit_size = 5.0
+max_distance = 40.0
+bus = &"Sound"
+
+[node name="DeselectSound" type="AudioStreamPlayer3D" parent="." unique_id=293847104]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.731, 0.405, -2.518)
+stream = ExtResource("19_plturn")
+unit_size = 5.0
+pitch_scale = 0.5
+max_distance = 40.0
+bus = &"Sound"

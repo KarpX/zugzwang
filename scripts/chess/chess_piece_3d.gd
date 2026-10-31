@@ -49,7 +49,8 @@ func setup(type: String, white: bool, pos: Vector2i, piece_mesh: Mesh, piece_mat
 
 ## Плавное перемещение фигуры по доске
 ## is_glide: если true, фигура не приподнимается, а монотонно "плывет" по доске (эффект скрежета черных)
-func animate_to(target_world_pos: Vector3, duration: float = 0.35, is_glide: bool = false) -> void:
+## on_complete: вызывается по завершении анимации перемещения
+func animate_to(target_world_pos: Vector3, duration: float = 0.35, is_glide: bool = false, on_complete: Callable = Callable()) -> void:
 	if _move_tween and _move_tween.is_valid():
 		_move_tween.kill()
 	if _hover_tween and _hover_tween.is_valid():
@@ -68,6 +69,9 @@ func animate_to(target_world_pos: Vector3, duration: float = 0.35, is_glide: boo
 		mid_pos.y += 0.12
 		_move_tween.tween_property(self, "global_position", mid_pos, duration * 0.45)
 		_move_tween.tween_property(self, "global_position", target_world_pos, duration * 0.55)
+		
+	if on_complete.is_valid():
+		_move_tween.chain().tween_callback(on_complete)
 
 ## Анимация взятия фигуры (падение и растворение/уменьшение)
 func animate_capture(duration: float = 0.4) -> void:

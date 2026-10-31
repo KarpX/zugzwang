@@ -29,6 +29,15 @@ const STEP_Z: float = -0.5844
 @onready var camera_point: Marker3D = $CameraPoint
 @onready var pieces_container: Node3D = $Pieces
 @onready var highlights_container: Node3D = $Highlights
+@onready var player_turn_sound: AudioStreamPlayer3D = get_node_or_null("PlayerTurnSound")
+@onready var enemy_turn_sound: AudioStreamPlayer3D = get_node_or_null("EnemyTurnSound")
+@onready var capture_sound: AudioStreamPlayer3D = get_node_or_null("CaptureSound")
+@onready var deselect_sound: AudioStreamPlayer3D = get_node_or_null("DeselectSound")
+
+var sound_player_turn: AudioStream = preload("res://assets/sounds/chess_player_turn.ogg")
+var sound_enemy_turn: AudioStream = preload("res://assets/sounds/chess_enemy_turn.ogg")
+var sound_capture: AudioStream = preload("res://assets/sounds/chess_capture.wav")
+var sound_deselect: AudioStream = preload("res://assets/sounds/chess_deselect.wav")
 
 var logic: ChessLogic = null
 var piece_nodes: Dictionary = {} # Vector2i -> ChessPiece3D
@@ -59,6 +68,7 @@ func _get_event_bus() -> Node:
 func _ready() -> void:
 	_init_materials()
 	_init_meshes()
+	_setup_audio_players()
 	
 	logic = ChessLogicScript.new()
 	spawn_pieces()
@@ -191,7 +201,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		_handle_board_click()
 	elif event.is_action_pressed("ui_cancel") or (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT):
-		clear_selection()
+		cancel_selection()
 
 func _handle_board_click() -> void:
 	var viewport = get_viewport()
@@ -217,7 +227,7 @@ func _handle_board_click() -> void:
 	var cell: Vector2i = local_pos_to_cell(hit_local)
 	
 	if cell == Vector2i(-1, -1):
-		clear_selection()
+		cancel_selection()
 		return
 		
 	_on_cell_clicked(cell)
@@ -227,18 +237,24 @@ func _on_cell_clicked(cell: Vector2i) -> void:
 	
 	# Если кликнули на свою фигуру (Белые)
 	if piece_data != null and piece_data["is_white"] and logic.is_white_turn:
-		_select_cell(cell)
+		if selected_pos == cell:
+			# Повторный клик по уже выбранной фигуре -> отмена выбора
+			cancel_selection()
+		else:
+			_select_cell(cell)
 		return
 		
 	# Если клетка выбрана и кликнули на допустимый ход
 	if selected_pos != Vector2i(-1, -1) and (cell in current_legal_moves):
 		_execute_player_move(selected_pos, cell)
 	else:
-		clear_selection()
+		cancel_selection()
 
 func _select_cell(cell: Vector2i) -> void:
 	clear_selection()
 	selected_pos = cell
+	if logic == null:
+		logic = ChessLogicScript.new()
 	current_legal_moves = logic.get_legal_moves(cell)
 	
 	# Анимация поднятия выбранной фигуры
@@ -263,6 +279,20 @@ func clear_selection() -> void:
 	var bus = _get_event_bus()
 	if bus:
 		bus.square_deselected.emit()
+
+## Отмена выбора фигуры игроком с воспроизведением мягкого звука опускания на доску
+func cancel_selection() -> void:
+	if selected_pos != Vector2i(-1, -1):
+		var prev_node = piece_nodes.get(selected_pos)
+		var sound_pos: Vector3 = Vector3.ZERO
+		if prev_node and prev_node.is_inside_tree():
+			sound_pos = prev_node.global_position
+		elif is_inside_tree():
+			sound_pos = global_position
+		clear_selection()
+		_play_deselect_sound(sound_pos)
+	else:
+		clear_selection()
 
 func _draw_highlights() -> void:
 	_clear_highlights()
@@ -304,6 +334,7 @@ func _clear_highlights() -> void:
 		return
 	for child in highlights_container.get_children():
 		child.queue_free()
+		
 
 ## Выполнение хода игрока
 func _execute_player_move(from_pos: Vector2i, to_pos: Vector2i) -> void:
@@ -320,7 +351,8 @@ func _execute_player_move(from_pos: Vector2i, to_pos: Vector2i) -> void:
 	var bus = _get_event_bus()
 	
 	# Обработка взятия
-	if move_res["captured"]:
+	var is_capture: bool = move_res["captured"]
+	if is_capture:
 		var victim_node = piece_nodes.get(to_pos)
 		if victim_node:
 			victim_node.animate_capture()
@@ -333,7 +365,21 @@ func _execute_player_move(from_pos: Vector2i, to_pos: Vector2i) -> void:
 	piece_nodes.erase(from_pos)
 	piece_nodes[to_pos] = piece_node
 	piece_node.board_pos = to_pos
-	piece_node.animate_to(to_global(cell_to_local_pos(to_pos)), white_move_duration, false)
+	var target_world_pos: Vector3 = to_global(cell_to_local_pos(to_pos))
+	
+	if white_move_duration <= 0.05:
+		if is_capture:
+			_play_capture_sound(target_world_pos)
+		else:
+			_play_player_move_sound(target_world_pos)
+		piece_node.animate_to(target_world_pos, white_move_duration, false)
+	else:
+		piece_node.animate_to(target_world_pos, white_move_duration, false, func():
+			if is_capture:
+				_play_capture_sound(target_world_pos)
+			else:
+				_play_player_move_sound(target_world_pos)
+		)
 	
 	if bus:
 		bus.piece_moved.emit(from_pos, to_pos)
@@ -387,7 +433,14 @@ func _execute_ai_turn() -> void:
 	piece_nodes.erase(from_pos)
 	piece_nodes[to_pos] = piece_node
 	piece_node.board_pos = to_pos
-	piece_node.animate_to(to_global(cell_to_local_pos(to_pos)), black_move_duration, true)
+	
+	var start_world_pos: Vector3 = piece_node.global_position
+	var target_world_pos: Vector3 = to_global(cell_to_local_pos(to_pos))
+	_play_enemy_move_sound(start_world_pos, target_world_pos, black_move_duration)
+	
+	piece_node.animate_to(target_world_pos, black_move_duration, true, func():
+		_stop_enemy_move_sound()
+	)
 	
 	if bus:
 		bus.piece_moved.emit(from_pos, to_pos)
@@ -395,8 +448,109 @@ func _execute_ai_turn() -> void:
 	# Разрешаем ход игроку только после того, как черная фигура закончит медленное скольжение
 	var finish_timer = get_tree().create_timer(black_move_duration)
 	finish_timer.timeout.connect(func():
+		_stop_enemy_move_sound()
 		is_ai_thinking = false
 		if move_res["is_checkmate"]:
 			if bus:
 				bus.game_over.emit(logic.winner)
 	)
+
+# ==============================================================================
+# ЗВУКИ ПЕРЕМЕЩЕНИЯ ФИГУР (Player & Enemy Turn Audio)
+# ==============================================================================
+
+## Инициализация нод проигрывания звуков (если отсутствуют в сцене)
+func _setup_audio_players() -> void:
+	if player_turn_sound == null:
+		player_turn_sound = get_node_or_null("PlayerTurnSound")
+		if player_turn_sound == null:
+			player_turn_sound = AudioStreamPlayer3D.new()
+			player_turn_sound.name = "PlayerTurnSound"
+			player_turn_sound.stream = sound_player_turn
+			player_turn_sound.bus = &"Sound"
+			player_turn_sound.unit_size = 5.0
+			player_turn_sound.max_distance = 40.0
+			add_child(player_turn_sound)
+			
+	if enemy_turn_sound == null:
+		enemy_turn_sound = get_node_or_null("EnemyTurnSound")
+		if enemy_turn_sound == null:
+			enemy_turn_sound = AudioStreamPlayer3D.new()
+			enemy_turn_sound.name = "EnemyTurnSound"
+			enemy_turn_sound.stream = sound_enemy_turn
+			enemy_turn_sound.bus = &"Sound"
+			enemy_turn_sound.volume_db = -16.0
+			enemy_turn_sound.unit_size = 5.0
+			enemy_turn_sound.max_distance = 40.0
+			add_child(enemy_turn_sound)
+
+	if capture_sound == null:
+		capture_sound = get_node_or_null("CaptureSound")
+		if capture_sound == null:
+			capture_sound = AudioStreamPlayer3D.new()
+			capture_sound.name = "CaptureSound"
+			capture_sound.stream = sound_capture
+			capture_sound.bus = &"Sound"
+			capture_sound.unit_size = 5.0
+			capture_sound.max_distance = 40.0
+			add_child(capture_sound)
+
+	if deselect_sound == null:
+		deselect_sound = get_node_or_null("DeselectSound")
+		if deselect_sound == null:
+			deselect_sound = AudioStreamPlayer3D.new()
+			deselect_sound.name = "DeselectSound"
+			deselect_sound.stream = sound_deselect
+			deselect_sound.bus = &"Sound"
+			deselect_sound.volume_db = -4.0
+			deselect_sound.unit_size = 5.0
+			deselect_sound.max_distance = 40.0
+			add_child(deselect_sound)
+
+## Воспроизведение звука хода игрока (белые: четкий стук постановки на доску)
+func _play_player_move_sound(world_pos: Vector3) -> void:
+	if player_turn_sound == null:
+		_setup_audio_players()
+	if player_turn_sound and is_inside_tree() and player_turn_sound.is_inside_tree():
+		player_turn_sound.global_position = world_pos
+		player_turn_sound.pitch_scale = randf_range(0.96, 1.04)
+		player_turn_sound.play()
+
+## Воспроизведение звука взятия фигуры (сочный тяжелый удар дерева о дерево)
+func _play_capture_sound(world_pos: Vector3) -> void:
+	if capture_sound == null:
+		_setup_audio_players()
+	if capture_sound and is_inside_tree() and capture_sound.is_inside_tree():
+		capture_sound.global_position = world_pos
+		capture_sound.pitch_scale = randf_range(0.95, 1.05)
+		capture_sound.play()
+
+## Воспроизведение звука отмены выбора фигуры (мягкий глухой щелчок опускания на доску)
+func _play_deselect_sound(world_pos: Vector3) -> void:
+	if deselect_sound == null:
+		_setup_audio_players()
+	if deselect_sound and is_inside_tree() and deselect_sound.is_inside_tree():
+		deselect_sound.global_position = world_pos
+		deselect_sound.pitch_scale = randf_range(0.96, 1.04)
+		deselect_sound.play()
+
+## Воспроизведение звука хода врага (черные: медленное зловещее протаскивание по доске)
+func _play_enemy_move_sound(start_pos: Vector3, end_pos: Vector3, duration: float) -> void:
+	if enemy_turn_sound == null:
+		_setup_audio_players()
+	if enemy_turn_sound and is_inside_tree() and enemy_turn_sound.is_inside_tree():
+		enemy_turn_sound.global_position = start_pos
+		if duration > 0.1:
+			var normal_len: float = 1.846
+			enemy_turn_sound.pitch_scale = clampf(normal_len / duration, 0.75, 1.35)
+		else:
+			enemy_turn_sound.pitch_scale = 1.0
+		enemy_turn_sound.play()
+		
+		var sound_tween: Tween = create_tween()
+		sound_tween.tween_property(enemy_turn_sound, "global_position", end_pos, duration)
+
+## Остановка звука хода врага
+func _stop_enemy_move_sound() -> void:
+	if enemy_turn_sound and enemy_turn_sound.playing:
+		enemy_turn_sound.stop()
