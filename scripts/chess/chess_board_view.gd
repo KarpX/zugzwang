@@ -377,72 +377,21 @@ func _create_highlight_tile(cell: Vector2i, mat: Material, size: float) -> void:
 	var blood_lvl: int = blood_layers.get(cell, 0)
 	var pos: Vector3 = cell_to_local_pos(cell)
 	
-	# 1. Основной объемный маркер клетки.
-	# Если на клетке есть кровь/партиклы от взятия, поднимаем маркер над воксельной лужей (h ~0.04-0.05м)
-	# и увеличиваем площадь, чтобы маркер оставался идеально различим под любым углом.
 	var tile = MeshInstance3D.new()
 	var quad = BoxMesh.new()
 	
-	var h: float = 0.008
+	# Одинаковая толщина и размер маркера как на обычных клетках, так и на клетках с кровью
+	var h: float = 0.006
 	var y_offset: float = 0.004
-	var effective_size: float = size
-	
 	if blood_lvl > 0:
-		y_offset = 0.052 + float(blood_lvl - 1) * 0.008
-		h = 0.016
-		effective_size = maxf(size, 0.44)
+		# На луже крови только поднимаем маркер на поверхность лужи, сохраняя размер и форму абсолютно одинаковыми
+		y_offset = 0.052 + float(blood_lvl - 1) * 0.006
 		
-	quad.size = Vector3(effective_size, h, effective_size)
+	quad.size = Vector3(size, h, size)
 	tile.mesh = quad
 	tile.material_override = mat
 	tile.position = Vector3(pos.x, pos.y + y_offset, pos.z)
 	highlights_container.add_child(tile)
-	
-	# 2. Если на клетке лужа крови, добавляем также внешнюю светящуюся рамку по периметру клетки (0.52м),
-	# выходящую за пределы пятна и гарантирующую 100% считываемость границ доступного хода
-	if blood_lvl > 0:
-		_create_highlight_border(pos, mat, 0.52, y_offset)
-
-## Создание светящейся рамки по периметру клетки для гарантированной видимости поверх любых луж крови и партиклов
-func _create_highlight_border(cell_pos: Vector3, mat: Material, frame_size: float, y_offset: float) -> void:
-	var border_node = Node3D.new()
-	border_node.position = Vector3(cell_pos.x, cell_pos.y + y_offset, cell_pos.z)
-	
-	var thickness: float = 0.032
-	var bar_len: float = frame_size
-	var bar_h: float = 0.014
-	
-	var tb_box = BoxMesh.new()
-	tb_box.size = Vector3(bar_len, bar_h, thickness)
-	
-	var n_bar = MeshInstance3D.new()
-	n_bar.mesh = tb_box
-	n_bar.material_override = mat
-	n_bar.position = Vector3(0.0, 0.0, (frame_size - thickness) * 0.5)
-	border_node.add_child(n_bar)
-	
-	var s_bar = MeshInstance3D.new()
-	s_bar.mesh = tb_box
-	s_bar.material_override = mat
-	s_bar.position = Vector3(0.0, 0.0, -(frame_size - thickness) * 0.5)
-	border_node.add_child(s_bar)
-	
-	var lr_box = BoxMesh.new()
-	lr_box.size = Vector3(thickness, bar_h, bar_len - thickness * 2.0)
-	
-	var w_bar = MeshInstance3D.new()
-	w_bar.mesh = lr_box
-	w_bar.material_override = mat
-	w_bar.position = Vector3(-(frame_size - thickness) * 0.5, 0.0, 0.0)
-	border_node.add_child(w_bar)
-	
-	var e_bar = MeshInstance3D.new()
-	e_bar.mesh = lr_box
-	e_bar.material_override = mat
-	e_bar.position = Vector3((frame_size - thickness) * 0.5, 0.0, 0.0)
-	border_node.add_child(e_bar)
-	
-	highlights_container.add_child(border_node)
 
 func _clear_highlights() -> void:
 	if highlights_container == null:
