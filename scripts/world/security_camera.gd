@@ -31,6 +31,13 @@ extends Node3D
 @onready var camera_sound: AudioStreamPlayer3D = get_node_or_null("CameraSound")
 
 var _sound_timer: float = 0.0
+var _twitch_quat: Quaternion = Quaternion.IDENTITY
+var _twitch_tween: Tween = null
+
+func _get_event_bus() -> Node:
+	if not is_inside_tree():
+		return null
+	return get_node_or_null("/root/EventBus")
 
 func _ready() -> void:
 	if camera_sound == null:
@@ -42,6 +49,44 @@ func _ready() -> void:
 		if spotlight:
 			fov_margin_deg = spotlight.spot_angle
 	_resolve_target()
+	
+	var bus = _get_event_bus()
+	if bus and bus.has_signal("piece_captured"):
+		bus.piece_captured.connect(_on_piece_captured)
+
+## Нервный рывок сервопривода камеры при потерях фигур
+func twitch_camera(intensity: float = 0.35) -> void:
+	if _twitch_tween and _twitch_tween.is_valid():
+		_twitch_tween.kill()
+		
+	_update_camera_sound(true)
+	
+	var yaw_impulse: float = randf_range(0.25, 0.45) * (1.0 if randf() > 0.5 else -1.0) * intensity
+	var pitch_impulse: float = randf_range(-0.35, 0.15) * intensity
+	var target_q: Quaternion = Quaternion.from_euler(Vector3(pitch_impulse, yaw_impulse, 0.0))
+	
+	_twitch_tween = create_tween().set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+	_twitch_tween.tween_method(func(val: float):
+		_twitch_quat = Quaternion.IDENTITY.slerp(target_q, val)
+	, 1.0, 0.0, 0.75)
+	_twitch_tween.finished.connect(func():
+		_twitch_quat = Quaternion.IDENTITY
+		_update_camera_sound(false)
+	)
+
+func _on_piece_captured(piece_type: String, is_white: bool) -> void:
+	if not is_white:
+		return
+	var type: String = piece_type.to_lower()
+	match type:
+		"knight":
+			twitch_camera(0.45)
+		"bishop":
+			twitch_camera(0.30)
+		"rook":
+			twitch_camera(0.60)
+		"queen":
+			twitch_camera(0.95)
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PAUSED or what == NOTIFICATION_DISABLED or what == NOTIFICATION_UNPARENTED:
@@ -96,8 +141,11 @@ func _process(delta: float) -> void:
 	var angle_to_target: float = acos(cos_angle)
 	var fov_margin_rad: float = deg_to_rad(fov_margin_deg)
 
-	# 1. Если цель находится внутри поля зрения камеры — камера неподвижна
+	# 1. Если цель находится внутри поля зрения камеры — камера неподвижна (с учетом импульса вздрагивания)
 	if angle_to_target <= fov_margin_rad:
+		if _twitch_quat != Quaternion.IDENTITY:
+			var base_quat: Quaternion = global_basis.get_rotation_quaternion()
+			global_basis = Basis(base_quat * _twitch_quat)
 		_update_camera_sound(false, delta)
 		return
 
@@ -106,6 +154,9 @@ func _process(delta: float) -> void:
 	# Минимальный порог для защиты от шума floating-point
 	var min_threshold_rad: float = minf(deg_to_rad(turn_threshold_deg), deg_to_rad(0.05))
 	if excess_angle <= min_threshold_rad:
+		if _twitch_quat != Quaternion.IDENTITY:
+			var base_quat: Quaternion = global_basis.get_rotation_quaternion()
+			global_basis = Basis(base_quat * _twitch_quat)
 		_update_camera_sound(false, delta)
 		return
 
@@ -116,6 +167,8 @@ func _process(delta: float) -> void:
 
 	var total_quat_angle: float = current_quat.angle_to(target_quat)
 	if total_quat_angle < 0.0001:
+		if _twitch_quat != Quaternion.IDENTITY:
+			global_basis = Basis(current_quat * _twitch_quat)
 		_update_camera_sound(false, delta)
 		return
 
@@ -125,7 +178,7 @@ func _process(delta: float) -> void:
 	var slerp_fraction: float = clampf(turn_angle / total_quat_angle, 0.0, 1.0)
 
 	var next_quat: Quaternion = current_quat.slerp(target_quat, slerp_fraction)
-	global_basis = Basis(next_quat)
+	global_basis = Basis(next_quat * _twitch_quat)
 
 	_update_camera_sound(true, delta)
 

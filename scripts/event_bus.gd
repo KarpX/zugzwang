@@ -58,14 +58,27 @@ signal lamp_trouble_finished()
 ## Стадия разрушения бункера (1: Затишье [0-3], 2: Тревога [4-7], 3: Осада [8-11], 4: Коллапс [12+])
 signal escalation_stage_changed(stage: int, total_losses: int)
 
+## Обновление очков ценности армий (is_white, new_score от 40 до 0)
+signal score_updated(is_white: bool, new_score: int)
 
 # ==============================================================================
 # 4. СОСТОЯНИЕ И СЧЕТЧИКИ (State Helpers)
 # ==============================================================================
 
+const PIECE_VALUES: Dictionary = {
+	"pawn": 1,
+	"knight": 3,
+	"bishop": 3,
+	"rook": 5,
+	"queen": 10,
+	"king": 0
+}
+
 var total_losses: int = 0
 var white_losses: int = 0
 var black_losses: int = 0
+var white_score: int = 40
+var black_score: int = 40
 var current_stage: int = 1
 var is_in_board_mode: bool = false
 var is_game_finished: bool = false
@@ -78,12 +91,17 @@ func _ready() -> void:
 	lamp_flicker_triggered.connect(func(_idx, _dur): is_lamp_trouble_active = true)
 	lamp_trouble_finished.connect(func(): is_lamp_trouble_active = false)
 
-func _on_piece_captured(_piece_type: String, is_white: bool) -> void:
+func _on_piece_captured(piece_type: String, is_white: bool) -> void:
 	total_losses += 1
+	var piece_val: int = PIECE_VALUES.get(piece_type.to_lower(), 0)
 	if is_white:
 		white_losses += 1
+		white_score = maxi(0, white_score - piece_val)
+		score_updated.emit(true, white_score)
 	else:
 		black_losses += 1
+		black_score = maxi(0, black_score - piece_val)
+		score_updated.emit(false, black_score)
 	
 	_update_escalation_stage()
 
@@ -114,6 +132,8 @@ func reset_game_state() -> void:
 	total_losses = 0
 	white_losses = 0
 	black_losses = 0
+	white_score = 40
+	black_score = 40
 	current_stage = 1
 	is_in_board_mode = false
 	is_game_finished = false

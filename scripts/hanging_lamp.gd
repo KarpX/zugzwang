@@ -5,10 +5,23 @@ extends MeshInstance3D
 ## Точка опоры (pivot) модели находится вверху провода (на потолке),
 ## поэтому достаточно вращать узел по осям X и Z.
 
+## Точные длительности аудиофайлов lamp_troubles_1 .. lamp_troubles_4
+const TROUBLE_DURATIONS: Array[float] = [1.385, 1.846, 1.385, 2.308]
+
+## Длительность одного полного аудиоцикла metallic_squeeks.ogg (2.7692с)
+const SQUEAK_CYCLE_DURATION: float = 2.769229
+## Угловая скорость колебаний маятника, синхронизированная с аудиоциклом скрипа (2*PI / 2.7692)
+const SWING_ANGULAR_SPEED: float = TAU / SQUEAK_CYCLE_DURATION
+
+@export_group("Swinging & Squeak")
 @export var is_swinging: bool = false      ## Включить ли раскачивание
 @export var base_amplitude: float = 0.035  ## Фоновое легкое покачивание (радианы ~ 2 градуса)
-@export var swing_speed: float = 2.2       ## Скорость колебаний маятника
+@export var swing_speed: float = SWING_ANGULAR_SPEED ## Скорость колебаний маятника, точно синхронизированная с 2.7692с
 @export var damping: float = 0.985         ## Скорость затухания внешних толчков
+@export var squeak_sound: AudioStream = preload("res://assets/sounds/metallic_squeeks.ogg")
+@export var squeak_sound_bus: StringName = &"Sound"
+@export var squeak_base_volume_db: float = -14.0
+@export var squeak_max_volume_db: float = 1.5
 
 @export_group("Light Trouble FX")
 ## Коллекция звуков перебоя со светом (lamp_troubles_1 .. lamp_troubles_4)
@@ -30,8 +43,7 @@ extends MeshInstance3D
 		light_intensity_ratio = clampf(value, 0.0, 3.0)
 		_apply_light_intensity(light_intensity_ratio)
 
-## Точные длительности аудиофайлов lamp_troubles_1 .. lamp_troubles_4
-const TROUBLE_DURATIONS: Array[float] = [1.385, 1.846, 1.385, 2.308]
+const DEFAULT_BASE_AMPLITUDE: float = 0.035
 
 var _time: float = 0.0
 var _impulse_angle_x: float = 0.0
@@ -40,10 +52,12 @@ var _impulse_angle_z: float = 0.0
 var _omni_light: OmniLight3D = null
 var _ambient_audio: AudioStreamPlayer3D = null
 var _trouble_audio_player: AudioStreamPlayer3D = null
+var _squeak_audio_player: AudioStreamPlayer3D = null
 var _anim_player: AnimationPlayer = null
 var _glow_material: StandardMaterial3D = null
 var _trouble_tween: Tween = null
 var _ambient_tween: Tween = null
+var _amplitude_tween: Tween = null
 var _base_ambient_db: float = -8.0
 var _is_trouble_playing: bool = false
 var _last_sound_index: int = -1
@@ -51,9 +65,7 @@ var _last_sound_index: int = -1
 func _get_event_bus() -> Node:
 	if not is_inside_tree():
 		return null
-	if has_node("/root/EventBus"):
-		return get_node("/root/EventBus")
-	return null
+	return get_node_or_null("/root/EventBus")
 
 func _ready() -> void:
 	# 1. Локальная копия материала свечения колбы (чтобы не портить shared .tres на диске)
@@ -104,6 +116,23 @@ func _ready() -> void:
 		if trouble_sound_bus != &"":
 			_trouble_audio_player.bus = trouble_sound_bus
 
+	# 4.5. Инициализация 3D-плеера для звука скрипа подвеса (metallic_squeeks)
+	_squeak_audio_player = get_node_or_null("SqueakAudioPlayer") as AudioStreamPlayer3D
+	if _squeak_audio_player == null:
+		_squeak_audio_player = AudioStreamPlayer3D.new()
+		_squeak_audio_player.name = "SqueakAudioPlayer"
+		_squeak_audio_player.unit_size = 8.0
+		_squeak_audio_player.max_distance = 35.0
+		_squeak_audio_player.position = Vector3(0, 0, 0)
+		add_child(_squeak_audio_player)
+	_squeak_audio_player.stream = squeak_sound
+	_squeak_audio_player.bus = squeak_sound_bus
+	_squeak_audio_player.volume_db = squeak_base_volume_db
+	if squeak_sound is AudioStreamOggVorbis:
+		(squeak_sound as AudioStreamOggVorbis).loop = true
+	if is_swinging:
+		_squeak_audio_player.play()
+
 	# 5. Проверка наличия AnimationPlayer
 	_anim_player = get_node_or_null("AnimationPlayer") as AnimationPlayer
 	if _anim_player:
@@ -119,26 +148,61 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	if not is_swinging:
+		if _squeak_audio_player and _squeak_audio_player.playing:
+			_squeak_audio_player.stop()
 		return
 		
+	# Запуск воспроизведения скрипа, если раскачивание активно
+	if _squeak_audio_player and not _squeak_audio_player.playing:
+		_squeak_audio_player.play()
+
 	_time += delta * swing_speed
+
+	# Синхронизация волны звука и покачивания:
+	# Корректируем фазу _time по реальной позиции аудиобуфера для устранения малейшего дрифта
+	if _squeak_audio_player and _squeak_audio_player.playing:
+		var audio_pos: float = _squeak_audio_player.get_playback_position()
+		var target_phase: float = (audio_pos / SQUEAK_CYCLE_DURATION) * TAU
+		var phase_diff: float = wrapf(target_phase - _time, -PI, PI)
+		_time += phase_diff * clampf(delta * 6.0, 0.0, 1.0)
 	
-	# Затухание импульсов от толчков
+	# Затухание импульсов от внешних толчков
 	_impulse_angle_x *= pow(damping, delta * 60.0)
 	_impulse_angle_z *= pow(damping, delta * 60.0)
 	
-	# Гармоническое качание маятника (по двум осям для объемного движения)
-	var z_swing = sin(_time) * (base_amplitude + _impulse_angle_z)
-	var x_swing = sin(_time * 0.77 + 0.4) * (base_amplitude * 0.4 + _impulse_angle_x)
+	# Гармоническое качание маятника по двум осям (эллипс):
+	# В точке audio_pos=0.0с (первый скрип) cos(0) = +1.0 (максимальное отклонение)
+	# В точке audio_pos=1.38с (второй скрип) cos(PI) = -1.0 (противоположное отклонение)
+	var z_swing: float = cos(_time) * (base_amplitude + _impulse_angle_z)
+	var x_swing: float = sin(_time) * (base_amplitude * 0.45 + _impulse_angle_x)
 	
 	rotation.z = z_swing
 	rotation.x = x_swing
+
+	# Модуляция громкости скрипа в зависимости от силы покачивания лампы
+	if _squeak_audio_player:
+		var current_amp: float = maxf(absf(z_swing), absf(x_swing))
+		var impulse_factor: float = clampf((current_amp - base_amplitude) / 0.22, 0.0, 1.0)
+		_squeak_audio_player.volume_db = lerpf(squeak_base_volume_db, squeak_max_volume_db, impulse_factor)
 
 ## Функция для передачи импульса лампе (например, когда игрок задел лампу или при вспышке)
 func push(impulse_x: float, impulse_z: float) -> void:
 	_impulse_angle_x += impulse_x
 	_impulse_angle_z += impulse_z
 	is_swinging = true
+	if _squeak_audio_player and not _squeak_audio_player.playing:
+		_squeak_audio_player.play()
+
+## Увеличение амплитуды качания лампы с плавным затуханием до базового 0.035
+func trigger_amplitude_burst(target_amplitude: float, decay_duration: float = 6.5) -> void:
+	if _amplitude_tween and _amplitude_tween.is_valid():
+		_amplitude_tween.kill()
+	base_amplitude = target_amplitude
+	is_swinging = true
+	if _squeak_audio_player and not _squeak_audio_player.playing:
+		_squeak_audio_player.play()
+	_amplitude_tween = create_tween().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_amplitude_tween.tween_property(self, "base_amplitude", DEFAULT_BASE_AMPLITUDE, decay_duration)
 
 ## Применение текущего коэффициента к источнику света и материалу колбы
 func _apply_light_intensity(ratio: float) -> void:
@@ -151,17 +215,103 @@ func _apply_light_intensity(ratio: float) -> void:
 func _on_piece_captured(piece_type: String, is_white: bool) -> void:
 	if not trigger_on_pawn_death:
 		return
-	# Выключение света работает ТОЛЬКО при гибели белых пешек
-	if piece_type.to_lower() == "pawn" and is_white:
-		play_trouble_animation()
+	if not is_white:
+		return
+		
+	var type: String = piece_type.to_lower()
+	match type:
+		"pawn":
+			# Пешка: 2 самых быстрых звука перебоя (0 и 2). Лампу НЕ раскачиваем!
+			play_trouble_animation(-1, [0, 2])
+		"knight", "bishop":
+			# Конь и Слон: увеличиваем амплитуду до 0.3 с плавным затуханием до 0.035
+			trigger_amplitude_burst(0.3, 6.0)
+			play_trouble_animation(-1, [0, 1, 2, 3])
+		"rook":
+			# Ладья: мощный блэкаут на 0.85с со вспышкой перекала (все звуки). Лампу НЕ раскачиваем!
+			play_rook_outage()
+		"queen":
+			# Ферзь: увеличиваем амплитуду до 0.5 с плавным затуханием до 0.035 + катастрофический блэкаут 2.5с!
+			trigger_amplitude_burst(0.5, 9.0)
+			play_queen_catastrophic_outage(2.5)
 
-## Запуск анимации перебоя со светом со случайным или заданным звуком
-func play_trouble_animation(sound_index: int = -1) -> void:
+## Легкое дрожание света при потере коня/слона
+func _play_minor_flicker(duration: float = 0.3) -> void:
+	if _trouble_tween and _trouble_tween.is_valid():
+		_trouble_tween.kill()
+	_trouble_tween = create_tween().set_trans(Tween.TRANS_LINEAR)
+	_trouble_tween.tween_property(self, "light_intensity_ratio", 0.65, duration * 0.3)
+	_trouble_tween.tween_property(self, "light_intensity_ratio", 1.25, duration * 0.3)
+	_trouble_tween.tween_property(self, "light_intensity_ratio", 1.0, duration * 0.4)
+
+## Перебой со светом при потере Ладьи (глубокий блэкаут на 0.45с, вспышка перекала 1.6x)
+func play_rook_outage(sound_index: int = -1) -> void:
+	_kill_active_tweens()
+	_is_trouble_playing = true
+	var duration: float = 0.85
+
+	var bus = _get_event_bus()
+	if bus and bus.has_signal("lamp_flicker_triggered"):
+		bus.lamp_flicker_triggered.emit(-2, duration)
+
+	# Звук искрения из всех доступных звуков
+	var sound_idx: int = _pick_sound_index(sound_index, [0, 1, 2, 3])
+	if _trouble_audio_player and trouble_sounds.size() > 0:
+		_trouble_audio_player.stream = _get_stream_for_index(sound_idx)
+		_trouble_audio_player.play()
+
+	_trouble_tween = create_tween().set_trans(Tween.TRANS_LINEAR)
+	# Мгновенный блэкаут
+	_trouble_tween.tween_property(self, "light_intensity_ratio", 0.0, 0.03)
+	_trouble_tween.tween_interval(0.42)
+	# Вспышка перекала
+	_trouble_tween.tween_property(self, "light_intensity_ratio", 1.6, 0.05)
+	_trouble_tween.tween_property(self, "light_intensity_ratio", 0.85, 0.1)
+	_trouble_tween.tween_property(self, "light_intensity_ratio", 1.0, 0.25).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_trouble_tween.finished.connect(_on_trouble_finished)
+
+## Катастрофический блэкаут при потере Ферзя (свет вырубается на 2.5 секунды)
+func play_queen_catastrophic_outage(duration: float = 2.5) -> void:
 	_kill_active_tweens()
 	_is_trouble_playing = true
 
-	# 1. Выбираем случайный звук из коллекции (без прямого повтора предыдущего)
-	var sound_idx: int = _pick_sound_index(sound_index)
+	var bus = _get_event_bus()
+	if bus and bus.has_signal("lamp_flicker_triggered"):
+		bus.lamp_flicker_triggered.emit(-3, duration)
+
+	# Воспроизводим самый длинный звук перебоя (lamp_troubles_4)
+	if _trouble_audio_player and trouble_sounds.size() >= 4:
+		_trouble_audio_player.stream = trouble_sounds[3]
+		_trouble_audio_player.play()
+
+	# Гул полностью приглушается
+	if _ambient_audio and _ambient_audio.playing:
+		_ambient_audio.volume_db = _base_ambient_db - 45.0
+		_ambient_tween = create_tween().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		_ambient_tween.tween_interval(duration - 0.4)
+		_ambient_tween.tween_property(_ambient_audio, "volume_db", _base_ambient_db, 0.4)
+
+	_trouble_tween = create_tween().set_trans(Tween.TRANS_LINEAR)
+	# Свет мгновенно гаснет в 0.0
+	_trouble_tween.tween_property(self, "light_intensity_ratio", 0.0, 0.02)
+	_trouble_tween.tween_interval(duration - 0.45) # 2 секунды абсолютной тьмы
+	# Попытки запуска генератора
+	_trouble_tween.tween_property(self, "light_intensity_ratio", 0.4, 0.04)
+	_trouble_tween.tween_property(self, "light_intensity_ratio", 0.05, 0.04)
+	_trouble_tween.tween_property(self, "light_intensity_ratio", 0.8, 0.05)
+	_trouble_tween.tween_property(self, "light_intensity_ratio", 0.2, 0.05)
+	_trouble_tween.tween_property(self, "light_intensity_ratio", 1.5, 0.07)
+	_trouble_tween.tween_property(self, "light_intensity_ratio", 1.0, 0.2).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_trouble_tween.finished.connect(_on_trouble_finished)
+
+## Запуск анимации перебоя со светом со случайным или заданным звуком
+## allowed_indices: разрешенные индексы звуков (например, [0, 2] для быстрых звуков пешки)
+func play_trouble_animation(sound_index: int = -1, allowed_indices: Array[int] = []) -> void:
+	_kill_active_tweens()
+	_is_trouble_playing = true
+
+	# 1. Выбираем случайный звук из разрешенного пула (без прямого повтора предыдущего)
+	var sound_idx: int = _pick_sound_index(sound_index, allowed_indices)
 	var selected_stream: AudioStream = _get_stream_for_index(sound_idx)
 	var duration: float = _get_duration_for_index(sound_idx, selected_stream)
 
@@ -183,10 +333,7 @@ func play_trouble_animation(sound_index: int = -1) -> void:
 		_ambient_tween.tween_interval(duck_wait)
 		_ambient_tween.tween_property(_ambient_audio, "volume_db", _base_ambient_db, 0.35)
 
-	# 4. Первичный толчок маятника лампы
-	push(randf_range(-0.11, 0.11), randf_range(-0.08, 0.08))
-
-	# 5. Проверяем наличие индивидуальной AnimationPlayer дорожки
+	# 4. Проверяем наличие индивидуальной AnimationPlayer дорожки
 	var anim_name: String = "light_trouble_%d" % (sound_idx + 1)
 	if _anim_player:
 		if _anim_player.has_animation(anim_name):
@@ -203,21 +350,34 @@ func play_trouble_animation(sound_index: int = -1) -> void:
 	# 6. Процедурная анимация, точно синхронизированная с аудиоволной выбранного звука
 	_play_procedural_flicker(sound_idx)
 
-func _pick_sound_index(forced_index: int) -> int:
+func _pick_sound_index(forced_index: int, allowed_indices: Array[int] = []) -> int:
 	if forced_index >= 0:
 		_last_sound_index = forced_index
 		return forced_index
 		
-	var pool_size: int = trouble_sounds.size()
-	if pool_size <= 1:
-		_last_sound_index = 0
+	var pool: Array[int] = []
+	if not allowed_indices.is_empty():
+		for idx in allowed_indices:
+			if idx >= 0 and idx < trouble_sounds.size():
+				pool.append(idx)
+	else:
+		for i in range(trouble_sounds.size()):
+			pool.append(i)
+			
+	if pool.is_empty():
 		return 0
+	if pool.size() == 1:
+		_last_sound_index = pool[0]
+		return pool[0]
 		
 	var candidates: Array[int] = []
-	for i in range(pool_size):
-		if i != _last_sound_index:
-			candidates.append(i)
+	for idx in pool:
+		if idx != _last_sound_index:
+			candidates.append(idx)
 			
+	if candidates.is_empty():
+		candidates = pool
+		
 	var chosen: int = candidates[randi() % candidates.size()]
 	_last_sound_index = chosen
 	return chosen
@@ -234,34 +394,9 @@ func _get_duration_for_index(idx: int, stream: AudioStream) -> float:
 		return stream.get_length()
 	return 1.385
 
-## Импульсы раскачивания маятника на пиках искр при воспроизведении через AnimationPlayer
-func _schedule_trouble_impulses(sound_idx: int) -> void:
-	var impulse_tween = create_tween()
-	match sound_idx:
-		0:
-			impulse_tween.tween_interval(0.92)
-			impulse_tween.tween_callback(func(): push(randf_range(-0.08, 0.08), randf_range(-0.05, 0.05)))
-			impulse_tween.tween_interval(0.31)
-			impulse_tween.tween_callback(func(): push(randf_range(-0.09, 0.09), randf_range(-0.06, 0.06)))
-		1:
-			impulse_tween.tween_interval(0.42)
-			impulse_tween.tween_callback(func(): push(randf_range(-0.11, 0.11), randf_range(-0.07, 0.07)))
-			impulse_tween.tween_interval(0.58)
-			impulse_tween.tween_callback(func(): push(randf_range(-0.09, 0.09), randf_range(-0.06, 0.06)))
-			impulse_tween.tween_interval(0.56)
-			impulse_tween.tween_callback(func(): push(randf_range(-0.08, 0.08), randf_range(-0.05, 0.05)))
-		2:
-			impulse_tween.tween_interval(0.34)
-			impulse_tween.tween_callback(func(): push(randf_range(-0.10, 0.10), randf_range(-0.07, 0.07)))
-			impulse_tween.tween_interval(0.48)
-			impulse_tween.tween_callback(func(): push(randf_range(-0.09, 0.09), randf_range(-0.06, 0.06)))
-		3:
-			impulse_tween.tween_interval(0.57)
-			impulse_tween.tween_callback(func(): push(randf_range(-0.13, 0.13), randf_range(-0.08, 0.08)))
-			impulse_tween.tween_interval(0.67)
-			impulse_tween.tween_callback(func(): push(randf_range(-0.09, 0.09), randf_range(-0.06, 0.06)))
-			impulse_tween.tween_interval(0.81)
-			impulse_tween.tween_callback(func(): push(randf_range(-0.06, 0.06), randf_range(-0.04, 0.04)))
+## Зарезервировано для эффектов на пиках искр (раскачивание контролируется через trigger_amplitude_burst)
+func _schedule_trouble_impulses(_sound_idx: int) -> void:
+	pass
 
 ## Процедурная анимация мерцания света, синхронизированная с точными пиками аудиоволн
 func _play_procedural_flicker(sound_idx: int) -> void:
@@ -278,13 +413,11 @@ func _play_procedural_flicker(sound_idx: int) -> void:
 			_trouble_tween.tween_property(self, "light_intensity_ratio", 0.55, 0.10)
 			_trouble_tween.tween_property(self, "light_intensity_ratio", 0.30, 0.10)
 			_trouble_tween.tween_property(self, "light_intensity_ratio", 0.60, 0.06)
-			_trouble_tween.tween_callback(func(): push(randf_range(-0.08, 0.08), randf_range(-0.05, 0.05)))
 			_trouble_tween.tween_property(self, "light_intensity_ratio", 1.35, 0.06)
 			_trouble_tween.tween_property(self, "light_intensity_ratio", 0.05, 0.04)
 			_trouble_tween.tween_property(self, "light_intensity_ratio", 0.15, 0.07)
 			_trouble_tween.tween_property(self, "light_intensity_ratio", 0.50, 0.07)
 			_trouble_tween.tween_property(self, "light_intensity_ratio", 0.75, 0.08)
-			_trouble_tween.tween_callback(func(): push(randf_range(-0.09, 0.09), randf_range(-0.06, 0.06)))
 			_trouble_tween.tween_property(self, "light_intensity_ratio", 1.45, 0.05)
 			_trouble_tween.tween_property(self, "light_intensity_ratio", 0.90, 0.07)
 			_trouble_tween.tween_property(self, "light_intensity_ratio", 1.00, 0.085).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
@@ -297,18 +430,15 @@ func _play_procedural_flicker(sound_idx: int) -> void:
 			_trouble_tween.tween_property(self, "light_intensity_ratio", 0.20, 0.09)
 			_trouble_tween.tween_property(self, "light_intensity_ratio", 0.45, 0.10)
 			_trouble_tween.tween_property(self, "light_intensity_ratio", 0.25, 0.10)
-			_trouble_tween.tween_callback(func(): push(randf_range(-0.11, 0.11), randf_range(-0.07, 0.07)))
 			_trouble_tween.tween_property(self, "light_intensity_ratio", 1.65, 0.02)
 			_trouble_tween.tween_property(self, "light_intensity_ratio", 0.00, 0.05)
 			_trouble_tween.tween_interval(0.53) # Долгая тьма более полусекунды
-			_trouble_tween.tween_callback(func(): push(randf_range(-0.09, 0.09), randf_range(-0.06, 0.06)))
 			_trouble_tween.tween_property(self, "light_intensity_ratio", 1.40, 0.01)
 			_trouble_tween.tween_property(self, "light_intensity_ratio", 0.35, 0.03)
 			_trouble_tween.tween_property(self, "light_intensity_ratio", 0.60, 0.11)
 			_trouble_tween.tween_property(self, "light_intensity_ratio", 0.40, 0.10)
 			_trouble_tween.tween_property(self, "light_intensity_ratio", 0.70, 0.10)
 			_trouble_tween.tween_property(self, "light_intensity_ratio", 0.10, 0.12)
-			_trouble_tween.tween_callback(func(): push(randf_range(-0.08, 0.08), randf_range(-0.05, 0.05)))
 			_trouble_tween.tween_property(self, "light_intensity_ratio", 1.50, 0.09)
 			_trouble_tween.tween_property(self, "light_intensity_ratio", 0.85, 0.09)
 			_trouble_tween.tween_property(self, "light_intensity_ratio", 1.00, 0.196).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
@@ -318,14 +448,12 @@ func _play_procedural_flicker(sound_idx: int) -> void:
 			_trouble_tween.tween_property(self, "light_intensity_ratio", 1.40, 0.01)
 			_trouble_tween.tween_property(self, "light_intensity_ratio", 0.00, 0.03)
 			_trouble_tween.tween_interval(0.29)
-			_trouble_tween.tween_callback(func(): push(randf_range(-0.10, 0.10), randf_range(-0.07, 0.07)))
 			_trouble_tween.tween_property(self, "light_intensity_ratio", 1.65, 0.01)
 			_trouble_tween.tween_property(self, "light_intensity_ratio", 0.45, 0.05)
 			_trouble_tween.tween_property(self, "light_intensity_ratio", 0.20, 0.08)
 			_trouble_tween.tween_property(self, "light_intensity_ratio", 0.50, 0.08)
 			_trouble_tween.tween_property(self, "light_intensity_ratio", 0.00, 0.06)
 			_trouble_tween.tween_interval(0.20)
-			_trouble_tween.tween_callback(func(): push(randf_range(-0.09, 0.09), randf_range(-0.06, 0.06)))
 			_trouble_tween.tween_property(self, "light_intensity_ratio", 1.55, 0.01)
 			_trouble_tween.tween_property(self, "light_intensity_ratio", 0.60, 0.07)
 			_trouble_tween.tween_property(self, "light_intensity_ratio", 0.80, 0.10)
@@ -335,18 +463,15 @@ func _play_procedural_flicker(sound_idx: int) -> void:
 		3: # lamp_troubles_4.ogg (2.308s: тишина 0.00-0.57с, гигантская вспышка 0.57с, тьма 0.71-1.24с, вспышка 1.24с, тьма 1.28-1.96с, зажигание 2.05с)
 			_trouble_tween.tween_property(self, "light_intensity_ratio", 0.00, 0.01)
 			_trouble_tween.tween_interval(0.56) # Долгая напряженная пауза в темноте
-			_trouble_tween.tween_callback(func(): push(randf_range(-0.13, 0.13), randf_range(-0.08, 0.08)))
 			_trouble_tween.tween_property(self, "light_intensity_ratio", 1.75, 0.01)
 			_trouble_tween.tween_property(self, "light_intensity_ratio", 0.60, 0.04)
 			_trouble_tween.tween_property(self, "light_intensity_ratio", 0.35, 0.06)
 			_trouble_tween.tween_property(self, "light_intensity_ratio", 0.00, 0.03)
 			_trouble_tween.tween_interval(0.53) # Вторая пауза темноты
-			_trouble_tween.tween_callback(func(): push(randf_range(-0.09, 0.09), randf_range(-0.06, 0.06)))
 			_trouble_tween.tween_property(self, "light_intensity_ratio", 1.50, 0.01)
 			_trouble_tween.tween_property(self, "light_intensity_ratio", 0.00, 0.03)
 			_trouble_tween.tween_interval(0.68) # Третья пауза темноты
 			_trouble_tween.tween_property(self, "light_intensity_ratio", 0.35, 0.03)
-			_trouble_tween.tween_callback(func(): push(randf_range(-0.06, 0.06), randf_range(-0.04, 0.04)))
 			_trouble_tween.tween_property(self, "light_intensity_ratio", 1.35, 0.06)
 			_trouble_tween.tween_property(self, "light_intensity_ratio", 0.70, 0.07)
 			_trouble_tween.tween_property(self, "light_intensity_ratio", 1.10, 0.08)

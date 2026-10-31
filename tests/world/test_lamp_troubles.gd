@@ -1,7 +1,19 @@
 extends SceneTree
 
 func _init() -> void:
+	_run_tests.call_deferred()
+
+func _run_tests() -> void:
 	print("--- [Lamp Troubles Test Suite] Запуск тестов белых пешек и блокировки хода противника ---")
+	
+	# 0. Инициализируем EventBus до сцены комнаты, чтобы _ready() всех нод мог подписаться на шину
+	var bus = root.get_node_or_null("EventBus")
+	if bus == null:
+		var bus_script = load("res://scripts/event_bus.gd")
+		bus = bus_script.new()
+		bus.name = "EventBus"
+		root.add_child(bus)
+	assert(bus != null, "EventBus синглтон должен присутствовать")
 	
 	# Загрузка сцены комнаты
 	var scene = load("res://scenes/room.tscn")
@@ -9,6 +21,8 @@ func _init() -> void:
 	
 	var room = scene.instantiate()
 	root.add_child(room)
+	
+	await process_frame
 	
 	# 1. Проверяем наличие узла HangingBulb
 	var lamp = room.find_child("HangingBulb", true)
@@ -33,18 +47,22 @@ func _init() -> void:
 	assert(anim_player.has_animation("light_trouble_4"), "Должна присутствовать анимация light_trouble_4")
 	print("[PASS] Тест 3: Все 4 анимации light_trouble_1..4 настроены с точными длительностями аудиоволн")
 	
-	var bus = root.get_node_or_null("EventBus")
-	assert(bus != null, "EventBus синглтон должен присутствовать")
+	# 3.5. Проверяем синхронизацию раскачивания и звука скрипа metallic_squeeks
+	assert(hanging_lamp._squeak_audio_player != null, "Плеер SqueakAudioPlayer должен быть инициализирован")
+	assert(hanging_lamp.squeak_sound != null, "Звук metallic_squeeks должен быть назначен")
+	assert(absf(hanging_lamp.swing_speed - HangingLamp.SWING_ANGULAR_SPEED) < 0.001, "Скорость качания маятника должна быть строго синхронизирована с 2.7692с")
+	print("[PASS] Тест 3.5: Звук metallic_squeeks и физика раскачивания маятника синхронизированы")
 	
 	# 4. ТЕСТ: Перебой со светом срабатывает ТОЛЬКО на БЕЛЫЕ пешки (is_white == true)
 	hanging_lamp._on_trouble_finished()
 	assert(hanging_lamp._is_trouble_playing == false, "Начальное состояние: перебой не играет")
 	
-	# Взятие БЕЛОЙ пешки -> ДОЛЖНО включить перебой
+	# Взятие БЕЛОЙ пешки -> ДОЛЖНО включить перебой с одним из 2 самых быстрых звуков (0 или 2)
 	bus.piece_captured.emit("pawn", true)
 	assert(hanging_lamp._is_trouble_playing == true, "Смерть БЕЛОЙ пешки должна активировать перебой со светом")
+	assert(hanging_lamp._last_sound_index == 0 or hanging_lamp._last_sound_index == 2, "Пешка должна использовать только 2 самых быстрых звука (0 или 2)")
 	assert(bus.is_lamp_trouble_active == true, "EventBus.is_lamp_trouble_active должен стать true")
-	print("[PASS] Тест 4: Смерть БЕЛОЙ пешки успешно активирует перебой со светом")
+	print("[PASS] Тест 4: Смерть БЕЛОЙ пешки использует только быстрые звуки (индекс %d) и активирует перебой" % hanging_lamp._last_sound_index)
 	
 	hanging_lamp._on_trouble_finished()
 	assert(bus.is_lamp_trouble_active == false, "EventBus.is_lamp_trouble_active должен сброситься в false")
@@ -55,12 +73,12 @@ func _init() -> void:
 	assert(bus.is_lamp_trouble_active == false, "EventBus.is_lamp_trouble_active должен оставаться false")
 	print("[PASS] Тест 5: Смерть ЧЕРНОЙ пешки НЕ вызывает перебой со светом (только белые)")
 	
-	# Взятие других белых фигур (ладья, ферзь) -> НЕ ДОЛЖНО включить перебой
-	bus.piece_captured.emit("rook", true)
-	assert(hanging_lamp._is_trouble_playing == false, "Взятие белой ладьи НЕ должно вызывать перебой")
-	bus.piece_captured.emit("queen", true)
-	assert(hanging_lamp._is_trouble_playing == false, "Взятие белого ферзя НЕ должно вызывать перебой")
-	print("[PASS] Тест 6: Взятие других белых фигур (rook, queen) не вызывает перебой (только пешки)")
+	# 6. ТЕСТ: Черные фигуры не вызывают перебой лампы
+	bus.piece_captured.emit("queen", false)
+	assert(hanging_lamp._is_trouble_playing == false, "Взятие черного ферзя НЕ должно вызывать перебой в бункере")
+	bus.piece_captured.emit("rook", false)
+	assert(hanging_lamp._is_trouble_playing == false, "Взятие черной ладьи НЕ должно вызывать перебой в бункере")
+	print("[PASS] Тест 6: Потери врага (черные) не вызывают внутренних перебоев освещения")
 	
 	# 7. ТЕСТ: Противник НЕ может сделать ход, пока проигрывается анимация
 	var chess_board = room.find_child("ChessBoard", true)

@@ -18,20 +18,46 @@ var is_near_table: bool = false
 
 var _cam_tween: Tween = null
 var _hud_prompt: Label = null
+var _radio_subtitle_label: Label = null
+var _radio_tween: Tween = null
 var _chess_board_node: Node3D = null
+
+const RADIO_REPORTS_WHITE: Dictionary = {
+	"pawn": [
+		"«1-е отделение 3-го взвода перестало выходить на связь...»",
+		"«Окоп 14 засыпан землей. Живых нет.»",
+		"«Рядовой погиб на переправе.»"
+	],
+	"knight": [
+		"«Разведгруппа \"Сокол\" накрыта кассетным ударом в секторе B!»",
+		"«Бронемашина связи уничтожена дроном. Координат нет!»"
+	],
+	"bishop": [
+		"«Артиллерийский расчет батареи \"Север\" уничтожен контрбатарейным огнем!»",
+		"«Наводчики погибли. Мы ослепли на восточном фланге!»"
+	],
+	"rook": [
+		"«ДОТ-4 пробит бетонобойным снарядом! Весь гарнизон погиб!»",
+		"«Укрепрайон \"Цитадель\" пал! Враг прорвал главную линию обороны!»"
+	],
+	"queen": [
+		"«ШТАБ АРМИИ УНИЧТОЖЕН ПРЯМЫМ ПОПАДАНИЕМ! КОМАНДОВАНИЯ БОЛЬШЕ НЕТ!»",
+		"«ПОЛНЫЙ РАЗГРОМ! ВСЕМ ПОДРАЗДЕЛЕНИЯМ — ДЕЙСТВОВАТЬ САМОСТОЯТЕЛЬНО!»"
+	]
+}
 
 # Параметры тряски камеры (Screen Shake при взятиях и стуках)
 var _trauma: float = 0.0
-var _shake_decay: float = 2.8        # Скорость затухания
-var _max_shake_offset: float = 0.045 # Максимальное смещение в метрах
-var _max_shake_roll: float = 0.035   # Максимальный крен в радианах
+var _shake_decay: float = 2.8        # Базовая скорость затухания
+var _current_shake_decay: float = 2.8
+var _base_max_shake_offset: float = 0.045 # Базовое смещение в метрах
+var _current_max_shake_offset: float = 0.045
+var _current_max_roll: float = 0.0   # Дополнительный крен при сильной тряске
 
 func _get_event_bus() -> Node:
 	if not is_inside_tree():
 		return null
-	if has_node("/root/EventBus"):
-		return get_node("/root/EventBus")
-	return null
+	return get_node_or_null("/root/EventBus")
 
 func _ready() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
@@ -55,21 +81,54 @@ func _setup_audio_listener() -> void:
 
 func _setup_hud() -> void:
 	var canvas = CanvasLayer.new()
+	canvas.name = "PlayerHUD"
+	canvas.layer = 20 # Поверх 3D-графики и спецэффектов
 	add_child(canvas)
 	
+	var root_ctrl = Control.new()
+	root_ctrl.name = "HudRoot"
+	root_ctrl.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	root_ctrl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	canvas.add_child(root_ctrl)
+	
 	_hud_prompt = Label.new()
+	_hud_prompt.name = "HudPrompt"
 	_hud_prompt.text = ""
 	_hud_prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_hud_prompt.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_hud_prompt.anchors_preset = Control.PRESET_BOTTOM_WIDE
-	_hud_prompt.offset_top = -90.0
-	_hud_prompt.offset_bottom = -30.0
+	_hud_prompt.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+	_hud_prompt.offset_top = -65.0
+	_hud_prompt.offset_bottom = -20.0
 	_hud_prompt.add_theme_font_size_override("font_size", 20)
 	_hud_prompt.add_theme_color_override("font_color", Color(0.9, 0.9, 0.85, 0.9))
 	_hud_prompt.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
 	_hud_prompt.add_theme_constant_override("shadow_offset_x", 1)
 	_hud_prompt.add_theme_constant_override("shadow_offset_y", 1)
-	canvas.add_child(_hud_prompt)
+	_hud_prompt.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root_ctrl.add_child(_hud_prompt)
+
+	# Радио-сводка военных потерь (субтитры внизу экрана)
+	_radio_subtitle_label = Label.new()
+	_radio_subtitle_label.name = "RadioSubtitle"
+	_radio_subtitle_label.text = ""
+	_radio_subtitle_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_radio_subtitle_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_radio_subtitle_label.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+	_radio_subtitle_label.offset_left = 40.0
+	_radio_subtitle_label.offset_right = -40.0
+	_radio_subtitle_label.offset_top = -145.0
+	_radio_subtitle_label.offset_bottom = -75.0
+	_radio_subtitle_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_radio_subtitle_label.add_theme_font_size_override("font_size", 22)
+	_radio_subtitle_label.add_theme_color_override("font_color", Color(1.0, 0.84, 0.35, 1.0))
+	_radio_subtitle_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 1.0))
+	_radio_subtitle_label.add_theme_constant_override("shadow_offset_x", 2)
+	_radio_subtitle_label.add_theme_constant_override("shadow_offset_y", 2)
+	_radio_subtitle_label.add_theme_color_override("font_outline_color", Color(0.04, 0.04, 0.04, 0.95))
+	_radio_subtitle_label.add_theme_constant_override("outline_size", 5)
+	_radio_subtitle_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_radio_subtitle_label.modulate.a = 0.0
+	root_ctrl.add_child(_radio_subtitle_label)
 
 func _find_chess_board() -> void:
 	if not is_inside_tree():
@@ -110,31 +169,94 @@ func _process(delta: float) -> void:
 	_update_camera_shake(delta)
 
 ## Применение импульса тряски камеры
-func apply_camera_shake(amount: float = 0.6) -> void:
+func apply_camera_shake(amount: float = 0.6, decay_rate: float = 2.8, max_offset: float = 0.045, max_roll: float = 0.0) -> void:
 	_trauma = clampf(_trauma + amount, 0.0, 1.0)
+	_current_shake_decay = decay_rate
+	_current_max_shake_offset = maxf(_current_max_shake_offset, max_offset)
+	_current_max_roll = maxf(_current_max_roll, max_roll)
 
-## Обработчик взятия фигуры (сокрушительный удар по доске)
-func _on_piece_captured(_piece_type: String, _is_white: bool) -> void:
-	apply_camera_shake(0.65)
+## Показ радио-сводки военных потерь (субтитры внизу экрана)
+func show_radio_report(piece_type: String) -> void:
+	if _radio_subtitle_label == null or not is_inside_tree():
+		return
+		
+	var pool: Array = RADIO_REPORTS_WHITE.get(piece_type, [])
+	if pool.is_empty():
+		return
+		
+	var text_line: String = pool[randi() % pool.size()]
+	
+	# Цветовая кодировка степени тревоги в зависимости от ранга фигуры
+	match piece_type:
+		"queen":
+			_radio_subtitle_label.add_theme_color_override("font_color", Color(1.0, 0.28, 0.28, 1.0))
+		"rook":
+			_radio_subtitle_label.add_theme_color_override("font_color", Color(1.0, 0.65, 0.25, 1.0))
+		"knight", "bishop":
+			_radio_subtitle_label.add_theme_color_override("font_color", Color(1.0, 0.88, 0.35, 1.0))
+		_:
+			_radio_subtitle_label.add_theme_color_override("font_color", Color(0.95, 0.90, 0.75, 1.0))
+			
+	_radio_subtitle_label.text = text_line
+	_radio_subtitle_label.visible_ratio = 1.0
+	_radio_subtitle_label.modulate.a = 0.15
+	
+	if _radio_tween and _radio_tween.is_valid():
+		_radio_tween.kill()
+		
+	_radio_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	# Быстрое и надежное проявление текста
+	_radio_tween.tween_property(_radio_subtitle_label, "modulate:a", 1.0, 0.20)
+	# Время удержания на экране
+	_radio_tween.tween_interval(4.5)
+	# Плавное угасание в темноту
+	_radio_tween.tween_property(_radio_subtitle_label, "modulate:a", 0.0, 0.8)
+
+## Обработчик взятия фигуры (сотрясение комнаты и радио-сводка потерь)
+func _on_piece_captured(piece_type: String, is_white: bool) -> void:
+	if is_white:
+		var piece_key: String = piece_type.to_lower()
+		match piece_key:
+			"pawn":
+				apply_camera_shake(0.20, 3.2, 0.035, 0.0)
+			"knight", "bishop":
+				apply_camera_shake(0.40, 2.5, 0.055, 0.015)
+			"rook":
+				apply_camera_shake(0.65, 2.0, 0.085, 0.035)
+			"queen":
+				# Катастрофа при потере Ферзя: камера трясется ОЧЕНЬ сильно (максимальная травма, долгое затухание, амплитуда 14см и крен)
+				apply_camera_shake(1.0, 0.85, 0.14, 0.07)
+			_:
+				apply_camera_shake(0.30, 2.8, 0.045, 0.0)
+		show_radio_report(piece_key)
+	else:
+		# Взятие черной фигуры игроком: отдача удара без панических сводок
+		apply_camera_shake(0.30, 2.8, 0.045, 0.0)
 
 ## Обработчик стука в дверь бункера
 func _on_door_knock_triggered(knock_level: int) -> void:
-	apply_camera_shake(0.35 * float(knock_level))
+	apply_camera_shake(0.35 * float(knock_level), 2.2, 0.05 * float(knock_level), 0.015 * float(knock_level))
 
-## Обновление тряски камеры со спадом (используем только h_offset и v_offset для предотвращения крена камеры)
+## Обновление тряски камеры со спадом
 func _update_camera_shake(delta: float) -> void:
 	if _trauma <= 0.0:
 		if camera != null:
 			camera.h_offset = 0.0
 			camera.v_offset = 0.0
+			camera.rotation.z = 0.0
+		_current_shake_decay = _shake_decay
+		_current_max_shake_offset = _base_max_shake_offset
+		_current_max_roll = 0.0
 		return
 		
-	_trauma = maxf(0.0, _trauma - _shake_decay * delta)
+	_trauma = maxf(0.0, _trauma - _current_shake_decay * delta)
 	var shake_power: float = _trauma * _trauma
 	
 	if camera != null:
-		camera.h_offset = randf_range(-1.0, 1.0) * _max_shake_offset * shake_power
-		camera.v_offset = randf_range(-1.0, 1.0) * _max_shake_offset * shake_power
+		camera.h_offset = randf_range(-1.0, 1.0) * _current_max_shake_offset * shake_power
+		camera.v_offset = randf_range(-1.0, 1.0) * _current_max_shake_offset * shake_power
+		if _current_max_roll > 0.0:
+			camera.rotation.z = randf_range(-1.0, 1.0) * _current_max_roll * shake_power
 
 func _physics_process(delta: float) -> void:
 	# Гравитация

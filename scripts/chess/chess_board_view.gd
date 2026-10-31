@@ -73,9 +73,7 @@ var _is_light_trouble_active: bool = false
 func _get_event_bus() -> Node:
 	if not is_inside_tree():
 		return null
-	if has_node("/root/EventBus"):
-		return get_node("/root/EventBus")
-	return null
+	return get_node_or_null("/root/EventBus")
 
 func _ready() -> void:
 	_init_materials()
@@ -180,6 +178,21 @@ func _on_lamp_flicker_triggered(sound_idx: int, _duration: float) -> void:
 			_board_light_tween.tween_property(board_light, "light_energy", 0.70, 0.07)
 			_board_light_tween.tween_property(board_light, "light_energy", 1.10, 0.08)
 			_board_light_tween.tween_property(board_light, "light_energy", 1.00, 0.108).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		-2: # Rook outage (0.85s)
+			_board_light_tween.tween_property(board_light, "light_energy", 0.0, 0.03)
+			_board_light_tween.tween_interval(0.42)
+			_board_light_tween.tween_property(board_light, "light_energy", 1.6, 0.05)
+			_board_light_tween.tween_property(board_light, "light_energy", 0.85, 0.1)
+			_board_light_tween.tween_property(board_light, "light_energy", 1.0, 0.25).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		-3: # Queen catastrophic blackout (2.5s)
+			_board_light_tween.tween_property(board_light, "light_energy", 0.0, 0.02)
+			_board_light_tween.tween_interval(2.05)
+			_board_light_tween.tween_property(board_light, "light_energy", 0.4, 0.04)
+			_board_light_tween.tween_property(board_light, "light_energy", 0.05, 0.04)
+			_board_light_tween.tween_property(board_light, "light_energy", 0.8, 0.05)
+			_board_light_tween.tween_property(board_light, "light_energy", 0.2, 0.05)
+			_board_light_tween.tween_property(board_light, "light_energy", 1.5, 0.07)
+			_board_light_tween.tween_property(board_light, "light_energy", 1.0, 0.2).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
 ## Окончание перебоя со светом: восстановление подсветки и возобновление хода ИИ
 func _on_lamp_trouble_finished() -> void:
