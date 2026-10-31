@@ -180,7 +180,7 @@ max_distance = 12.0
 environment = SubResource("Environment_m4ky1")
 
 [node name="HangingBulb" type="MeshInstance3D" parent="." unique_id=1404448631]
-transform = Transform3D(0.25, 0, 0, 0, 0.25, 0, 0, 0, 0.25, 16, 12.503, 20)
+transform = Transform3D(0.25, 0, 0, 0, 0.25, 0, 0, 0, 0.25, 16, 13.032922, 20)
 cast_shadow = 0
 mesh = ExtResource("6_bulb")
 surface_material_override/0 = ExtResource("7_cordsocket")
@@ -191,7 +191,7 @@ is_swinging = true
 [node name="OmniLight3D" type="OmniLight3D" parent="HangingBulb" unique_id=1332429521]
 transform = Transform3D(4, 0, 0, 0, 4, 0, 0, 0, 4, 0, -14.1, 0)
 light_color = Color(1, 0.9411765, 0.6627451, 1)
-light_energy = 1.005
+light_energy = 0.62
 light_bake_mode = 1
 shadow_enabled = true
 shadow_bias = 0.05
@@ -206,7 +206,7 @@ material_override = ExtResource("10_tablemat")
 mesh = ExtResource("4_14vil")
 
 [node name="ChessBoard" parent="TableStatic/Table" unique_id=21915507 groups=["chess_board"] instance=ExtResource("5_board")]
-transform = Transform3D(-0.7, 0, -6.119594e-08, 0, 0.7, 0, 6.119594e-08, 0, -0.7, -1.8481598, 5.6, -1.751934)
+transform = Transform3D(-0.7, 0, -6.119594e-08, 0, 0.7, 0, 6.119594e-08, 0, -0.7, -1.8477612, 5.6046634, -1.7485161)
 black_move_duration = 2.5
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="TableStatic" unique_id=1298941691]

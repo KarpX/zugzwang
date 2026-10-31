@@ -4,6 +4,8 @@
 
 [resource]
 resource_name = "bord_material"
+cull_mode = 0
 albedo_texture = ExtResource("1_tex")
-roughness = 0.35
+metallic_specular = 0.25
+roughness = 0.68
 texture_filter = 0
