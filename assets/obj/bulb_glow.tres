@@ -1,4 +1,4 @@
-[gd_resource type="StandardMaterial3D" load_steps=2 format=3 uid="uid://bulbglow001"]
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://bulbglow001"]
 
 [ext_resource type="Texture2D" uid="uid://bm2uxqtr4ndse" path="res://assets/obj/bulb.png" id="1_tex"]
 
