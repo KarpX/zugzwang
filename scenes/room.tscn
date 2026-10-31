@@ -20,8 +20,10 @@
 [ext_resource type="Material" uid="uid://cammaterial01" path="res://assets/obj/camera_material.tres" id="12_cammat"]
 [ext_resource type="AudioStream" uid="uid://d35f8fhkj4urh" path="res://assets/sounds/bulb_ambient.ogg" id="15_katsu"]
 [ext_resource type="Script" uid="uid://bfjdrebj064ye" path="res://scripts/world/door_knock_timer.gd" id="16_door"]
+[ext_resource type="Material" uid="uid://doormat001" path="res://assets/obj/door_material.tres" id="17_doormat"]
 [ext_resource type="ArrayMesh" uid="uid://cjcw86qhrw4vp" path="res://assets/obj/radio.obj" id="17_radio_mesh"]
 [ext_resource type="Material" uid="uid://radiomat001" path="res://assets/obj/radio_material.tres" id="18_radio_mat"]
+[ext_resource type="AudioStream" uid="uid://b0rlwhbc4a7ux" path="res://assets/sounds/lamp_troubles_1.ogg" id="19_trouble_sfx"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_x5vg1"]
 size = Vector3(40.07849, 13.515747, 0.60009766)
@@ -64,6 +66,127 @@ volumetric_fog_albedo = Color(0.78431374, 0.78431374, 0.74509805, 1)
 volumetric_fog_anisotropy = 0.3
 adjustment_enabled = true
 adjustment_saturation = 0.9
+
+[sub_resource type="Animation" id="Animation_lamp_trouble_1"]
+resource_name = "light_trouble_1"
+length = 1.385
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath(".:light_intensity_ratio")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.02, 0.04, 0.08, 0.46, 0.5, 0.6, 0.7, 0.8, 0.86, 0.92, 0.96, 1.03, 1.1, 1.18, 1.23, 1.3, 1.385),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1),
+"update": 0,
+"values": [1.0, 0.05, 1.6, 0.0, 0.0, 0.35, 0.2, 0.55, 0.3, 0.6, 1.35, 0.05, 0.15, 0.5, 0.75, 1.45, 0.9, 1.0]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("OmniLight3D:light_energy")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.02, 0.04, 0.08, 0.46, 0.5, 0.6, 0.7, 0.8, 0.86, 0.92, 0.96, 1.03, 1.1, 1.18, 1.23, 1.3, 1.385),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1),
+"update": 0,
+"values": [1.0, 0.05, 1.6, 0.0, 0.0, 0.35, 0.2, 0.55, 0.3, 0.6, 1.35, 0.05, 0.15, 0.5, 0.75, 1.45, 0.9, 1.0]
+}
+
+[sub_resource type="Animation" id="Animation_lamp_trouble_2"]
+resource_name = "light_trouble_2"
+length = 1.846
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath(".:light_intensity_ratio")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.01, 0.03, 0.08, 0.11, 0.2, 0.3, 0.4, 0.42, 0.47, 1, 1.01, 1.04, 1.15, 1.25, 1.35, 1.47, 1.56, 1.65, 1.846),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1),
+"update": 0,
+"values": [1.0, 1.6, 0.05, 0.0, 0.35, 0.2, 0.45, 0.25, 1.65, 0.0, 0.0, 1.4, 0.35, 0.6, 0.4, 0.7, 0.1, 1.5, 0.85, 1.0]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("OmniLight3D:light_energy")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.01, 0.03, 0.08, 0.11, 0.2, 0.3, 0.4, 0.42, 0.47, 1, 1.01, 1.04, 1.15, 1.25, 1.35, 1.47, 1.56, 1.65, 1.846),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1),
+"update": 0,
+"values": [1.0, 1.6, 0.05, 0.0, 0.35, 0.2, 0.45, 0.25, 1.65, 0.0, 0.0, 1.4, 0.35, 0.6, 0.4, 0.7, 0.1, 1.5, 0.85, 1.0]
+}
+
+[sub_resource type="Animation" id="Animation_lamp_trouble_3"]
+resource_name = "light_trouble_3"
+length = 1.385
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath(".:light_intensity_ratio")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.01, 0.02, 0.05, 0.34, 0.35, 0.4, 0.48, 0.56, 0.62, 0.82, 0.83, 0.9, 1, 1.15, 1.385),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1),
+"update": 0,
+"values": [1.0, 0.05, 1.4, 0.0, 0.0, 1.65, 0.45, 0.2, 0.5, 0.0, 0.0, 1.55, 0.6, 0.8, 1.15, 1.0]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("OmniLight3D:light_energy")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.01, 0.02, 0.05, 0.34, 0.35, 0.4, 0.48, 0.56, 0.62, 0.82, 0.83, 0.9, 1, 1.15, 1.385),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1),
+"update": 0,
+"values": [1.0, 0.05, 1.4, 0.0, 0.0, 1.65, 0.45, 0.2, 0.5, 0.0, 0.0, 1.55, 0.6, 0.8, 1.15, 1.0]
+}
+
+[sub_resource type="Animation" id="Animation_lamp_trouble_4"]
+resource_name = "light_trouble_4"
+length = 2.308
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath(".:light_intensity_ratio")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.01, 0.57, 0.58, 0.62, 0.68, 0.71, 1.24, 1.25, 1.28, 1.96, 1.99, 2.05, 2.12, 2.2, 2.308),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1),
+"update": 0,
+"values": [1.0, 0.0, 0.0, 1.75, 0.6, 0.35, 0.0, 0.0, 1.5, 0.0, 0.0, 0.35, 1.35, 0.7, 1.1, 1.0]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("OmniLight3D:light_energy")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.01, 0.57, 0.58, 0.62, 0.68, 0.71, 1.24, 1.25, 1.28, 1.96, 1.99, 2.05, 2.12, 2.2, 2.308),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1),
+"update": 0,
+"values": [1.0, 0.0, 0.0, 1.75, 0.6, 0.35, 0.0, 0.0, 1.5, 0.0, 0.0, 0.35, 1.35, 0.7, 1.1, 1.0]
+}
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_lamp"]
+_data = {
+&"light_trouble": SubResource("Animation_lamp_trouble_1"),
+&"light_trouble_1": SubResource("Animation_lamp_trouble_1"),
+&"light_trouble_2": SubResource("Animation_lamp_trouble_2"),
+&"light_trouble_3": SubResource("Animation_lamp_trouble_3"),
+&"light_trouble_4": SubResource("Animation_lamp_trouble_4")
+}
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_5vh7c"]
 size = Vector3(4.996704, 5.402466, 4.8352737)
@@ -123,7 +246,7 @@ material_override = ExtResource("11_cambasemat")
 mesh = ExtResource("3_7dqbv")
 
 [node name="CameraPivot" type="Node3D" parent="walls/CameraBase" unique_id=1142422552]
-transform = Transform3D(-0.2576304, 0, -0.96624357, 0, 1, 0, 0.96624357, 0, -0.2576304, 0, 2, 0.5)
+transform = Transform3D(-0.06518748, 0.34836644, -0.93508905, 0.032228604, 0.93732816, 0.34695387, 0.9973526, -0.0075195567, -0.07232945, 0, 2, 0.5)
 script = ExtResource("6_seccam")
 tracking_speed = 3.0
 min_pitch_deg = -10.0
@@ -232,6 +355,17 @@ unit_size = 3.0
 max_db = 1.0
 autoplay = true
 max_distance = 25.0
+
+[node name="TroubleAudioPlayer" type="AudioStreamPlayer3D" parent="HangingBulb" unique_id=1420703585]
+transform = Transform3D(4, 0, 0, 0, 4, 0, 0, 0, 4, 0, -14.1, 0)
+stream = ExtResource("19_trouble_sfx")
+volume_db = 2.0
+unit_size = 15.0
+max_distance = 50.0
+bus = &"Sound"
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="HangingBulb" unique_id=1420703586]
+libraries/ = SubResource("AnimationLibrary_lamp")
 
 [node name="TableStatic" type="StaticBody3D" parent="." unique_id=1486369480]
 

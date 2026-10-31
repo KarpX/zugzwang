@@ -86,8 +86,8 @@
 ```
 40 очков ──────────► 30 очков ──────────► 20 очков ──────────► 10 очков ──────────► 0 очков
 (Старт)              (Фаза I)             (Фаза II)            (Фаза III)           (Финал)
-                     Белые: Трещины       Белые: Аварийный свет Белые: Заклинило дверь Белые: Коллапс
-                     Черные: Канонада     Черные: Пожар/Сирены  Черные: Мертвый эфир  Черные: Пустота
+					 Белые: Трещины       Белые: Аварийный свет Белые: Заклинило дверь Белые: Коллапс
+					 Черные: Канонада     Черные: Пожар/Сирены  Черные: Мертвый эфир  Черные: Пустота
 ```
 
 ---
@@ -259,12 +259,12 @@
 1. **Счетчики очков ценности в `scripts/chess/chess_logic.gd`**:
    ```gdscript
    const PIECE_VALUES: Dictionary = {
-       "pawn": 1,
-       "knight": 3,
-       "bishop": 3,
-       "rook": 5,
-       "queen": 10,
-       "king": 0
+	   "pawn": 1,
+	   "knight": 3,
+	   "bishop": 3,
+	   "rook": 5,
+	   "queen": 10,
+	   "king": 0
    }
    var white_score: int = 40
    var black_score: int = 40
@@ -273,32 +273,32 @@
    При вызове `EventBus.piece_captured.emit(piece_type, is_white)` также пересчитываются остатки очков и эмитится проверка порогов:
    ```gdscript
    if is_white:
-       white_score -= PIECE_VALUES.get(piece_type, 0)
-       EventBus.score_updated.emit(true, white_score)
+	   white_score -= PIECE_VALUES.get(piece_type, 0)
+	   EventBus.score_updated.emit(true, white_score)
    else:
-       black_score -= PIECE_VALUES.get(piece_type, 0)
-       EventBus.score_updated.emit(false, black_score)
+	   black_score -= PIECE_VALUES.get(piece_type, 0)
+	   EventBus.score_updated.emit(false, black_score)
    ```
 
 ### 6.2. Dev 2 (Bunker & Environment):
 1. **Реакция на микро-события белых**:
    - В `hanging_lamp.gd`: добавить импульс раскачивания по Tween при потере коня/слона:
-     ```gdscript
-     func apply_impulse(intensity: float) -> void:
-         var t = create_tween().set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
-         t.tween_property(self, "rotation_degrees:z", randf_range(-intensity, intensity), 0.3)
-         t.tween_property(self, "rotation_degrees:z", 0.0, 1.2)
-     ```
+	 ```gdscript
+	 func apply_impulse(intensity: float) -> void:
+		 var t = create_tween().set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+		 t.tween_property(self, "rotation_degrees:z", randf_range(-intensity, intensity), 0.3)
+		 t.tween_property(self, "rotation_degrees:z", 0.0, 1.2)
+	 ```
    - В `security_camera.gd`: метод `twitch_camera(angle: float)`, заставляющий камеру испуганно дернуться и вернуть фокус.
 2. **Реакция на макро-пороги**:
    - Хранить 4 ноды трещин (`MeshInstance3D` или `Decal`) со скрытой видимостью (`visible = false`) и включать их последовательно при стадиях I–IV.
    - Смена цвета `OmniLight3D` лампы через Tween:
-     ```gdscript
-     func set_emergency_light() -> void:
-         var t = create_tween()
-         t.tween_property($OmniLight3D, "light_color", Color(1.0, 0.45, 0.2), 1.0)
-         t.parallel().tween_property($OmniLight3D, "light_energy", 0.6, 1.0)
-     ```
+	 ```gdscript
+	 func set_emergency_light() -> void:
+		 var t = create_tween()
+		 t.tween_property($OmniLight3D, "light_color", Color(1.0, 0.45, 0.2), 1.0)
+		 t.parallel().tween_property($OmniLight3D, "light_energy", 0.6, 1.0)
+	 ```
 
 ### 6.3. Dev 3 (Audio, Juice & UI):
 1. **Trauma Screen Shake (Juice)**:

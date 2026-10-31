@@ -66,6 +66,10 @@ var select_highlight_mat: StandardMaterial3D
 # Меши для фигур
 var meshes: Dictionary = {}
 
+@onready var board_light: OmniLight3D = get_node_or_null("BoardLight")
+var _board_light_tween: Tween = null
+var _is_light_trouble_active: bool = false
+
 func _get_event_bus() -> Node:
 	if not is_inside_tree():
 		return null
@@ -92,6 +96,100 @@ func _ready() -> void:
 	var bus = _get_event_bus()
 	if bus and bus.has_signal("camera_mode_changed"):
 		bus.camera_mode_changed.connect(_on_camera_mode_changed)
+	if bus and bus.has_signal("lamp_flicker_triggered"):
+		bus.lamp_flicker_triggered.connect(_on_lamp_flicker_triggered)
+	if bus and bus.has_signal("lamp_trouble_finished"):
+		bus.lamp_trouble_finished.connect(_on_lamp_trouble_finished)
+
+## Синхронизация подсветки доски с перебоем света подвесной лампы
+func _on_lamp_flicker_triggered(sound_idx: int, _duration: float) -> void:
+	_is_light_trouble_active = true
+	if board_light == null:
+		return
+	if _board_light_tween and _board_light_tween.is_valid():
+		_board_light_tween.kill()
+	_board_light_tween = create_tween().set_trans(Tween.TRANS_LINEAR)
+	match sound_idx:
+		0: # lamp_troubles_1 (1.385s)
+			_board_light_tween.tween_property(board_light, "light_energy", 0.05, 0.02)
+			_board_light_tween.tween_property(board_light, "light_energy", 1.50, 0.02)
+			_board_light_tween.tween_property(board_light, "light_energy", 0.00, 0.04)
+			_board_light_tween.tween_interval(0.38)
+			_board_light_tween.tween_property(board_light, "light_energy", 0.35, 0.04)
+			_board_light_tween.tween_property(board_light, "light_energy", 0.20, 0.10)
+			_board_light_tween.tween_property(board_light, "light_energy", 0.55, 0.10)
+			_board_light_tween.tween_property(board_light, "light_energy", 0.30, 0.10)
+			_board_light_tween.tween_property(board_light, "light_energy", 0.60, 0.06)
+			_board_light_tween.tween_property(board_light, "light_energy", 1.35, 0.06)
+			_board_light_tween.tween_property(board_light, "light_energy", 0.05, 0.04)
+			_board_light_tween.tween_property(board_light, "light_energy", 0.15, 0.07)
+			_board_light_tween.tween_property(board_light, "light_energy", 0.50, 0.07)
+			_board_light_tween.tween_property(board_light, "light_energy", 0.75, 0.08)
+			_board_light_tween.tween_property(board_light, "light_energy", 1.45, 0.05)
+			_board_light_tween.tween_property(board_light, "light_energy", 0.90, 0.07)
+			_board_light_tween.tween_property(board_light, "light_energy", 1.00, 0.085).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		1: # lamp_troubles_2 (1.846s)
+			_board_light_tween.tween_property(board_light, "light_energy", 1.50, 0.01)
+			_board_light_tween.tween_property(board_light, "light_energy", 0.05, 0.02)
+			_board_light_tween.tween_property(board_light, "light_energy", 0.00, 0.05)
+			_board_light_tween.tween_property(board_light, "light_energy", 0.35, 0.03)
+			_board_light_tween.tween_property(board_light, "light_energy", 0.20, 0.09)
+			_board_light_tween.tween_property(board_light, "light_energy", 0.45, 0.10)
+			_board_light_tween.tween_property(board_light, "light_energy", 0.25, 0.10)
+			_board_light_tween.tween_property(board_light, "light_energy", 1.65, 0.02)
+			_board_light_tween.tween_property(board_light, "light_energy", 0.00, 0.05)
+			_board_light_tween.tween_interval(0.53)
+			_board_light_tween.tween_property(board_light, "light_energy", 1.40, 0.01)
+			_board_light_tween.tween_property(board_light, "light_energy", 0.35, 0.03)
+			_board_light_tween.tween_property(board_light, "light_energy", 0.60, 0.11)
+			_board_light_tween.tween_property(board_light, "light_energy", 0.40, 0.10)
+			_board_light_tween.tween_property(board_light, "light_energy", 0.70, 0.10)
+			_board_light_tween.tween_property(board_light, "light_energy", 0.10, 0.12)
+			_board_light_tween.tween_property(board_light, "light_energy", 1.50, 0.09)
+			_board_light_tween.tween_property(board_light, "light_energy", 0.85, 0.09)
+			_board_light_tween.tween_property(board_light, "light_energy", 1.00, 0.196).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		2: # lamp_troubles_3 (1.385s)
+			_board_light_tween.tween_property(board_light, "light_energy", 0.05, 0.01)
+			_board_light_tween.tween_property(board_light, "light_energy", 1.40, 0.01)
+			_board_light_tween.tween_property(board_light, "light_energy", 0.00, 0.03)
+			_board_light_tween.tween_interval(0.29)
+			_board_light_tween.tween_property(board_light, "light_energy", 1.65, 0.01)
+			_board_light_tween.tween_property(board_light, "light_energy", 0.45, 0.05)
+			_board_light_tween.tween_property(board_light, "light_energy", 0.20, 0.08)
+			_board_light_tween.tween_property(board_light, "light_energy", 0.50, 0.08)
+			_board_light_tween.tween_property(board_light, "light_energy", 0.00, 0.06)
+			_board_light_tween.tween_interval(0.20)
+			_board_light_tween.tween_property(board_light, "light_energy", 1.55, 0.01)
+			_board_light_tween.tween_property(board_light, "light_energy", 0.60, 0.07)
+			_board_light_tween.tween_property(board_light, "light_energy", 0.80, 0.10)
+			_board_light_tween.tween_property(board_light, "light_energy", 1.15, 0.15)
+			_board_light_tween.tween_property(board_light, "light_energy", 1.00, 0.235).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		3: # lamp_troubles_4 (2.308s)
+			_board_light_tween.tween_property(board_light, "light_energy", 0.00, 0.01)
+			_board_light_tween.tween_interval(0.56)
+			_board_light_tween.tween_property(board_light, "light_energy", 1.75, 0.01)
+			_board_light_tween.tween_property(board_light, "light_energy", 0.60, 0.04)
+			_board_light_tween.tween_property(board_light, "light_energy", 0.35, 0.06)
+			_board_light_tween.tween_property(board_light, "light_energy", 0.00, 0.03)
+			_board_light_tween.tween_interval(0.53)
+			_board_light_tween.tween_property(board_light, "light_energy", 1.50, 0.01)
+			_board_light_tween.tween_property(board_light, "light_energy", 0.00, 0.03)
+			_board_light_tween.tween_interval(0.68)
+			_board_light_tween.tween_property(board_light, "light_energy", 0.35, 0.03)
+			_board_light_tween.tween_property(board_light, "light_energy", 1.35, 0.06)
+			_board_light_tween.tween_property(board_light, "light_energy", 0.70, 0.07)
+			_board_light_tween.tween_property(board_light, "light_energy", 1.10, 0.08)
+			_board_light_tween.tween_property(board_light, "light_energy", 1.00, 0.108).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+## Окончание перебоя со светом: восстановление подсветки и возобновление хода ИИ
+func _on_lamp_trouble_finished() -> void:
+	_is_light_trouble_active = false
+	if board_light:
+		board_light.light_energy = 1.0
+	# Если ИИ черных ждал окончания анимации перед своим ходом — запускаем ход с атмосферной паузой
+	if is_ai_thinking and not logic.is_game_over and not logic.is_white_turn:
+		var resume_timer = get_tree().create_timer(0.35)
+		resume_timer.timeout.connect(_execute_ai_turn)
 
 func _init_materials() -> void:
 	# Белые: турнирный самшит с красным фетровым основанием
@@ -490,6 +588,15 @@ func _execute_ai_turn() -> void:
 	if logic.is_game_over or not is_inside_tree():
 		is_ai_thinking = false
 		return
+
+	# Блокировка: пока проигрывается анимация перебоя со светом, противник не может сделать ход
+	var bus = _get_event_bus()
+	var is_trouble: bool = _is_light_trouble_active
+	if bus and bus.get("is_lamp_trouble_active") == true:
+		is_trouble = true
+	if is_trouble:
+		is_ai_thinking = true
+		return
 		
 	var ai_move = logic.get_best_ai_move()
 	if ai_move.is_empty():
@@ -507,8 +614,6 @@ func _execute_ai_turn() -> void:
 	if not move_res["success"]:
 		is_ai_thinking = false
 		return
-		
-	var bus = _get_event_bus()
 	
 	# Обработка рокировки черных (анимация ладьи)
 	if move_res.get("castled", false):
