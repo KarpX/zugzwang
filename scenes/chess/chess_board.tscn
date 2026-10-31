@@ -2,11 +2,13 @@
 
 [ext_resource type="Script" uid="uid://bl81y7vbap87c" path="res://scripts/chess/chess_board_view.gd" id="1_cbv"]
 [ext_resource type="ArrayMesh" uid="uid://cjxv7daa7bp0c" path="res://assets/obj/bord.obj" id="2_bord"]
+[ext_resource type="Material" uid="uid://bordmat001" path="res://assets/obj/bord_material.tres" id="3_bordmat"]
 
 [node name="ChessBoard" type="Node3D" unique_id=67175096]
 script = ExtResource("1_cbv")
 
 [node name="Bord" type="MeshInstance3D" parent="." unique_id=1159060821]
+material_override = ExtResource("3_bordmat")
 mesh = ExtResource("2_bord")
 
 [node name="Pieces" type="Node3D" parent="." unique_id=2073502457]
