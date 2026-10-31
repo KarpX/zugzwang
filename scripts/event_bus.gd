@@ -47,6 +47,12 @@ signal door_knock_triggered(knock_level: int)
 ## Запуск финальной катсцены обрушения стен
 signal collapse_sequence_started()
 
+## Перебой со светом (индекс звука 0..3 и длительность перебоя в секундах)
+signal lamp_flicker_triggered(sound_index: int, duration: float)
+
+## Завершение анимации перебоя со светом (свет полностью восстановлен)
+signal lamp_trouble_finished()
+
 
 # ==============================================================================
 # 3. ЭСКАЛАЦИЯ КОМНАТЫ (4 стадии разрушения)
@@ -66,11 +72,14 @@ var black_losses: int = 0
 var current_stage: int = 1
 var is_in_board_mode: bool = false
 var is_game_finished: bool = false
+var is_lamp_trouble_active: bool = false
 
 func _ready() -> void:
 	# Подключаем внутренний учет потерь к сигналу взятия фигуры
 	piece_captured.connect(_on_piece_captured)
 	game_over.connect(_on_game_over)
+	lamp_flicker_triggered.connect(func(_idx, _dur): is_lamp_trouble_active = true)
+	lamp_trouble_finished.connect(func(): is_lamp_trouble_active = false)
 
 func _on_piece_captured(_piece_type: String, is_white: bool) -> void:
 	total_losses += 1
@@ -111,3 +120,4 @@ func reset_game_state(playthrough: int = 1) -> void:
 	current_stage = 1
 	is_game_finished = false
 	game_reset.emit(playthrough)
+	is_lamp_trouble_active = false
