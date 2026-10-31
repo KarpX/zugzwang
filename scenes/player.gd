@@ -121,13 +121,12 @@ func _on_piece_captured(_piece_type: String, _is_white: bool) -> void:
 func _on_door_knock_triggered(knock_level: int) -> void:
 	apply_camera_shake(0.35 * float(knock_level))
 
-## Обновление тряски камеры со спадом
+## Обновление тряски камеры со спадом (используем только h_offset и v_offset для предотвращения крена камеры)
 func _update_camera_shake(delta: float) -> void:
 	if _trauma <= 0.0:
 		if camera != null:
 			camera.h_offset = 0.0
 			camera.v_offset = 0.0
-			camera.rotation.z = 0.0
 		return
 		
 	_trauma = maxf(0.0, _trauma - _shake_decay * delta)
@@ -136,7 +135,6 @@ func _update_camera_shake(delta: float) -> void:
 	if camera != null:
 		camera.h_offset = randf_range(-1.0, 1.0) * _max_shake_offset * shake_power
 		camera.v_offset = randf_range(-1.0, 1.0) * _max_shake_offset * shake_power
-		camera.rotation.z = randf_range(-1.0, 1.0) * _max_shake_roll * shake_power
 
 func _physics_process(delta: float) -> void:
 	# Гравитация
@@ -237,6 +235,12 @@ func enter_board_mode() -> void:
 		var diff_yaw: float = wrapf(target_euler.y - start_euler.y, -PI, PI)
 		var start_pitch: float = start_euler.x
 		var target_pitch: float = target_euler.x
+		
+		if head == null:
+			head = get_node_or_null("head")
+		if head != null:
+			_cam_tween.tween_property(head, "rotation:x", 0.0, 0.75)
+		_cam_tween.tween_property(self, "rotation:y", rotation.y + diff_yaw, 0.75)
 		
 		_cam_tween.tween_method(func(t: float):
 			var cur_origin: Vector3 = start_origin.lerp(target_origin, t)
