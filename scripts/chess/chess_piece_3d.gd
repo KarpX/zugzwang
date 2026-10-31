@@ -17,8 +17,6 @@ var mesh_instance: MeshInstance3D = null
 var _move_tween: Tween = null
 var _hover_tween: Tween = null
 var _is_selected: bool = false
-var kill_count: int = 0
-var _blood_droplets_container: Node3D = null
 
 func _ready() -> void:
 	scale = Vector3(0.8, 0.8, 0.8)
@@ -129,42 +127,8 @@ func change_type(new_type: String, new_mesh: Mesh, new_mat: Material) -> void:
 	else:
 		mesh_instance.rotation_degrees.y = 0.0
 
-## Закрепление 3D-партиклов (кубиков) крови на фигуре-убийце без изменения цвета самого материала
+## Заглушка для обратной совместимости вызовов взятия фигур
 func apply_blood_stain() -> void:
-	kill_count += 1
-	
-	if _blood_droplets_container == null:
-		_blood_droplets_container = Node3D.new()
-		_blood_droplets_container.name = "BloodDroplets"
-		add_child(_blood_droplets_container)
-		
-	var blood_mat: StandardMaterial3D = null
-	if ResourceLoader.exists("res://scripts/chess/voxel_blood_stain.gd"):
-		var VoxelScript = load("res://scripts/chess/voxel_blood_stain.gd")
-		if VoxelScript.has_method("get_blood_material"):
-			blood_mat = VoxelScript.get_blood_material()
-			
-	if blood_mat == null:
-		blood_mat = StandardMaterial3D.new()
-		blood_mat.albedo_color = Color(0.72, 0.03, 0.05)
-		blood_mat.roughness = 0.08
-		
-	# Создаем выразительные 3D-партиклы крови, налипающие на основание и тело фигуры
-	var new_drops_count: int = randi_range(9, 15)
-	for i in range(new_drops_count):
-		var drop = MeshInstance3D.new()
-		var drop_box = BoxMesh.new()
-		var drop_s: float = randf_range(0.018, 0.038)
-		drop_box.size = Vector3(drop_s, drop_s, drop_s)
-		drop.mesh = drop_box
-		drop.material_override = blood_mat
-		
-		# Расположение на поверхности фигуры (основание и туловище)
-		var angle: float = randf_range(0.0, TAU)
-		var h: float = randf_range(0.015, 0.22 + float(kill_count) * 0.06)
-		# Чем выше, тем тоньше фигура (конический контур)
-		var r: float = lerpf(0.15, 0.07, clampf(h / 0.5, 0.0, 1.0)) + randf_range(-0.015, 0.015)
-		
-		drop.position = Vector3(cos(angle) * r, h, sin(angle) * r)
-		drop.rotation = Vector3(randf_range(-0.35, 0.35), randf_range(0.0, TAU), randf_range(-0.35, 0.35))
-		_blood_droplets_container.add_child(drop)
+	pass
+
+

@@ -29,7 +29,7 @@ func _test_voxel_stain_generation() -> void:
 	assert(stain.multimesh_instance != null, "MultiMeshInstance3D должен быть создан")
 	var mm: MultiMesh = stain.multimesh_instance.multimesh
 	assert(mm != null, "MultiMesh должен быть назначен")
-	assert(mm.instance_count >= 15, "Пятно должно состоять из достаточного количества вокселей (>=15)")
+	assert(mm.instance_count >= 80, "Крупная лужа должна состоять из большого количества вокселей (>=80 для 90-100% клетки)")
 	assert(mm.use_colors == true, "MultiMesh должен иметь включенную поддержку цветов вокселей")
 	
 	var mat: StandardMaterial3D = stain.multimesh_instance.material_override as StandardMaterial3D
@@ -131,13 +131,11 @@ func _test_capture_triggers_blood_stain() -> void:
 	
 	assert(board.blood_layers.has(Vector2i(4, 4)), "На клетке (4, 4) должно зарегистрироваться пятно крови")
 	assert(board.blood_container.get_child_count() > 0, "В blood_container должен появиться объект вокселей")
-	assert(white_pawn.kill_count == 1, "Фигура-убийца должна получить kill_count = 1")
-	assert(white_pawn.get_node_or_null("BloodDroplets") != null, "На фигуре должны появиться воксели крови")
-	assert(white_pawn.get_node("BloodDroplets").get_child_count() > 0, "К фигуре должны быть прикреплены партиклы крови")
-	assert(white_pawn.mesh_instance.material_override == board.white_mat, "Цвет и материал самой фигуры не изменяются")
+	assert(white_pawn.mesh_instance.material_override == board.white_mat, "Цвет и материал самой фигуры остаются чистыми и неизменными")
+	assert(white_pawn.get_node_or_null("BloodDroplets") == null, "На самой фигуре не должно оставаться прикрепленных партиклов")
 	
 	board.free()
-	print("[PASS] Тест 5: Реальное взятие фигуры в игре создает воксельное пятно крови и окрашивает убийцу")
+	print("[PASS] Тест 5: Реальное взятие фигуры в игре создает воксельное пятно крови на доске, сохраняя фигуру чистой")
 
 ## Тест 6: Тряска камеры при взятии фигуры
 func _test_camera_shake_on_capture() -> void:

@@ -106,6 +106,7 @@ shape = SubResource("BoxShape3D_x5vg1")
 
 [node name="Door" type="MeshInstance3D" parent="walls" unique_id=1853457929]
 transform = Transform3D(0.8, 0, 0, 0, 0.8, 0, 0, 0, 0.8, 16, 0, 0)
+material_override = ExtResource("17_doormat")
 mesh = ExtResource("2_qvc4m")
 script = ExtResource("16_door")
 
@@ -258,3 +259,8 @@ omni_attenuation = 1.8
 [node name="CollisionShape3D" type="CollisionShape3D" parent="TableStatic" unique_id=1298941691]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.009525, 2.201233, 20.009485)
 shape = SubResource("BoxShape3D_5vh7c")
+
+[node name="OmniLight3D" type="OmniLight3D" parent="." unique_id=1155339198]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13.866306, 6.8546076, 4.8364277)
+visible = false
+omni_range = 9.884644
