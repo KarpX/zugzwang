@@ -25,11 +25,19 @@ var move_count: int = 0
 var is_game_over: bool = false
 var winner: String = "" # "white", "black", "draw"
 
-func _init() -> void:
-	reset_board()
+## Номер прохождения:
+## 1: Первое прохождение (высокая сложность, жадный хищный ИИ истребления армии игрока перед матом)
+## 2: Второе прохождение (средняя сложность, поддающийся ИИ выживания, отдающий фигуры ради спасения короля)
+var playthrough: int = 1
+var game_count: int = 1
 
-## Полный сброс доски в начальную расстановку
-func reset_board() -> void:
+func _init() -> void:
+	reset_board(1)
+
+## Полный сброс доски в начальную расстановку с возможностью смены прохождения
+func reset_board(new_playthrough: int = -1) -> void:
+	if new_playthrough > 0:
+		playthrough = new_playthrough
 	grid.clear()
 	for x in range(BOARD_SIZE):
 		var column: Array = []
@@ -66,6 +74,24 @@ func _create_piece(piece_type: String, is_white: bool) -> Dictionary:
 		"is_white": is_white,
 		"has_moved": false
 	}
+
+## Глубокая копия сетки фигур (для безопасного параллельного анализа хода в фоновом потоке)
+func clone_grid() -> Array[Array]:
+	var copy: Array[Array] = []
+	for x in range(BOARD_SIZE):
+		var col: Array = []
+		for y in range(BOARD_SIZE):
+			var p = grid[x][y]
+			if p == null:
+				col.append(null)
+			else:
+				col.append({
+					"type": p["type"],
+					"is_white": p["is_white"],
+					"has_moved": p.get("has_moved", false)
+				})
+		copy.append(col)
+	return copy
 
 func get_piece(pos: Vector2i) -> Variant:
 	if not is_inside(pos):
@@ -432,13 +458,17 @@ func has_any_legal_moves(is_white: bool) -> bool:
 					return true
 	return false
 
-## Жадный ИИ войны (Черные фигуры):
-## Приоритеты:
-## 1. Взятие наиболее ценной белой фигуры (+ценность * 10)
-## 2. Нападение на короля / шах
-## 3. Продвижение вперед к позиции белых
-## 4. Случайный легальный ход
+## Интеллектуальный выбор хода движка ChessBot (на базе Prashanna135/chess с адаптивной сложностью)
+## В 1-м прохождении: Hard, пожирание всех фигур белых перед матом
+## Во 2-м прохождении: Medium, поддавки, жертвование фигур ради выживания короля
 func get_best_ai_move() -> Dictionary:
+	var move: Dictionary = ChessBot.choose_best_move(grid, playthrough)
+	if not move.is_empty():
+		return move
+	return _fallback_ai_move()
+
+## Резервный выбор хода в случае пата/отсутствия решений движка
+func _fallback_ai_move() -> Dictionary:
 	var best_score: float = -999999.0
 	var best_moves: Array[Dictionary] = []
 	
@@ -460,7 +490,6 @@ func get_best_ai_move() -> Dictionary:
 	if best_moves.is_empty():
 		return {}
 		
-	# Выбираем случайный ход из лучших
 	return best_moves[randi() % best_moves.size()]
 
 func _evaluate_move(from_pos: Vector2i, to_pos: Vector2i) -> float:

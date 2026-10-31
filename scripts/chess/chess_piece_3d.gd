@@ -130,5 +130,3 @@ func change_type(new_type: String, new_mesh: Mesh, new_mat: Material) -> void:
 ## Заглушка для обратной совместимости вызовов взятия фигур
 func apply_blood_stain() -> void:
 	pass
-
-

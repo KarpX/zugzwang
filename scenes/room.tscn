@@ -22,6 +22,7 @@
 [ext_resource type="Script" uid="uid://bfjdrebj064ye" path="res://scripts/world/door_knock_timer.gd" id="16_door"]
 [ext_resource type="ArrayMesh" uid="uid://cjcw86qhrw4vp" path="res://assets/obj/radio.obj" id="17_radio_mesh"]
 [ext_resource type="Material" uid="uid://radiomat001" path="res://assets/obj/radio_material.tres" id="18_radio_mat"]
+[ext_resource type="Material" uid="uid://doormat001" path="res://assets/obj/door_material.tres" id="19_doormat"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_x5vg1"]
 size = Vector3(40.07849, 13.515747, 0.60009766)
@@ -106,7 +107,7 @@ shape = SubResource("BoxShape3D_x5vg1")
 
 [node name="Door" type="MeshInstance3D" parent="walls" unique_id=1853457929]
 transform = Transform3D(0.8, 0, 0, 0, 0.8, 0, 0, 0, 0.8, 16, 0, 0)
-material_override = ExtResource("17_doormat")
+material_override = ExtResource("19_doormat")
 mesh = ExtResource("2_qvc4m")
 script = ExtResource("16_door")
 
