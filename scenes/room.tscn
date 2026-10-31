@@ -20,6 +20,7 @@
 [ext_resource type="Material" uid="uid://cammaterial01" path="res://assets/obj/camera_material.tres" id="12_cammat"]
 [ext_resource type="AudioStream" uid="uid://d35f8fhkj4urh" path="res://assets/sounds/bulb_ambient.ogg" id="15_katsu"]
 [ext_resource type="Script" uid="uid://bfjdrebj064ye" path="res://scripts/world/door_knock_timer.gd" id="16_door"]
+[ext_resource type="Material" uid="uid://doormat001" path="res://assets/obj/door_material.tres" id="17_doormat"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_x5vg1"]
 size = Vector3(40.07849, 13.515747, 0.60009766)
@@ -104,6 +105,7 @@ shape = SubResource("BoxShape3D_x5vg1")
 
 [node name="Door" type="MeshInstance3D" parent="walls" unique_id=1853457929]
 transform = Transform3D(0.8, 0, 0, 0, 0.8, 0, 0, 0, 0.8, 16, 0, 0)
+material_override = ExtResource("17_doormat")
 mesh = ExtResource("2_qvc4m")
 script = ExtResource("16_door")
 
@@ -246,3 +248,8 @@ black_move_duration = 1.2
 [node name="CollisionShape3D" type="CollisionShape3D" parent="TableStatic" unique_id=1298941691]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.009525, 2.201233, 20.009485)
 shape = SubResource("BoxShape3D_5vh7c")
+
+[node name="OmniLight3D" type="OmniLight3D" parent="." unique_id=1155339198]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13.866306, 6.8546076, 4.8364277)
+visible = false
+omni_range = 9.884644

@@ -1,0 +1,11 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://doormat001"]
+
+[ext_resource type="Texture2D" uid="uid://dsjoa5n2wcafj" path="res://assets/obj/door.png" id="1_tex"]
+
+[resource]
+resource_name = "door_material"
+cull_mode = 0
+albedo_texture = ExtResource("1_tex")
+metallic_specular = 0.35
+roughness = 0.72
+texture_filter = 0
