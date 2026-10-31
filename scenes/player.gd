@@ -17,42 +17,107 @@ var can_walk: bool = true       # Перемещение WASD
 var is_near_table: bool = false
 
 var _cam_tween: Tween = null
-var _hud_prompt: Label = null
 var _radio_subtitle_label: Label = null
 var _radio_tween: Tween = null
+var _delayed_shake_tween: Tween = null
 var _chess_board_node: Node3D = null
+var _unused_radio_reports: Dictionary = {}
+var _unused_radio_reports_black: Dictionary = {}
 
 const RADIO_REPORTS_WHITE: Dictionary = {
 	"pawn": [
 		"«1-е отделение 3-го взвода перестало выходить на связь...»",
-		"«Окоп 14 засыпан землей. Живых нет.»",
-		"«Рядовой погиб на переправе.»"
+		"«Окоп 14 засыпан землей после артудара. Живых нет.»",
+		"«Рядовой погиб на переправе под перекрестным огнем.»",
+		"«Позиция \"Высота-8\" молчит. Дозор не отвечает на запросы.»",
+		"«Стрелковая рота прижата к болоту. Боекомплект пуст... тишина.»",
+		"«Блиндаж на восточной опушке смят прямым попаданием тяжелого снаряда.»",
+		"«Штурмовая группа осталась в нейтральной полосе. Эвакуация сорвана.»",
+		"«Снайпер снял наблюдателя на вышке. Линия обзора потеряна.»",
+		"«Блокпост №3 разбит в щепки. Защитники приняли бой до конца.»",
+		"«Взвод связистов погиб при восстановлении кабеля под минометами.»",
+		"«Опорный пункт у реки смят бронетехникой противника.»",
+		"«Санитарный транспорт расстрелян на трассе... выживших нет.»"
 	],
 	"knight": [
 		"«Разведгруппа \"Сокол\" накрыта кассетным ударом в секторе B!»",
-		"«Бронемашина связи уничтожена дроном. Координат нет!»"
+		"«Бронемашина связи уничтожена дроном-камикадзе. Координат нет!»",
+		"«Танковый взвод флангового прикрытия сожжен в засаде у лесополосы!»",
+		"«Мобильный резерв отрезан на перекрестке и ведет бой в полном окружении!»",
+		"«Экипаж головного БТР вызвал огонь на себя. Сигнал маяка оборвался.»",
+		"«Кавалерийский прорыв захлебнулся на минном поле под шквальным огнем!»"
 	],
 	"bishop": [
 		"«Артиллерийский расчет батареи \"Север\" уничтожен контрбатарейным огнем!»",
-		"«Наводчики погибли. Мы ослепли на восточном фланге!»"
+		"«Наводчики погибли на передовом пункте. Мы ослепли на восточном фланге!»",
+		"«Станция радиолокации разгромлена высокоточной ракетой противника!»",
+		"«Офицеры управления огнем дивизиона накрыты управляемой авиабомбой!»",
+		"«Снайперская пара на водонапорной башне ликвидирована сбросом с воздуха.»",
+		"«Батарея тяжелых гаубиц раздавлена гусеницами прорвавшейся бронегруппы!»"
 	],
 	"rook": [
 		"«ДОТ-4 пробит бетонобойным снарядом! Весь гарнизон погиб!»",
-		"«Укрепрайон \"Цитадель\" пал! Враг прорвал главную линию обороны!»"
+		"«Укрепрайон \"Цитадель\" пал! Враг прорвал главную долговременную линию обороны!»",
+		"«Железобетонный форт \"Бастион\" обрушен фугасами. Защитников погребло в казематах!»",
+		"«Опорный узел сектора Юг выжжен термитным зарядом. Внутри расплавленный металл!»",
+		"«Бронепоезд прикрытия сошел с рельсов после подрыва эстакады. Рубеж открыт!»",
+		"«Главный противотанковый вал перепахан авиацией. Тяжелые орудия замолчали!»"
 	],
 	"queen": [
 		"«ШТАБ АРМИИ УНИЧТОЖЕН ПРЯМЫМ ПОПАДАНИЕМ! КОМАНДОВАНИЯ БОЛЬШЕ НЕТ!»",
-		"«ПОЛНЫЙ РАЗГРОМ! ВСЕМ ПОДРАЗДЕЛЕНИЯМ — ДЕЙСТВОВАТЬ САМОСТОЯТЕЛЬНО!»"
+		"«ПОЛНЫЙ РАЗГРОМ! ВСЕМ ПОДРАЗДЕЛЕНИЯМ — ДЕЙСТВОВАТЬ САМОСТОЯТЕЛЬНО!»",
+		"«ГЕНЕРАЛЫ ПОГИБЛИ В БУНКЕРЕ СВЯЗИ! АРМИЯ ОБЕЗГЛАВЛЕНА, ФРОНТ РУШИТСЯ!»",
+		"«ЦЕНТРАЛЬНЫЙ УЗЕЛ УПРАВЛЕНИЯ СТЕРТ С ЛИЦА ЗЕМЛИ! МЫ ПРЕДАНЫ И ОСТАЛИСЬ ОДНИ!»"
+	],
+	"king": [
+		"«БУНКЕР ГЛАВНОКОМАНДУЮЩЕГО ВЗЯТ В ПЛОТНОЕ КОЛЬЦО! ДВЕРЬ ВЫБИТА...»"
 	]
 }
 
-# Параметры тряски камеры (Screen Shake при взятиях и стуках)
+const RADIO_REPORTS_BLACK: Dictionary = {
+	"pawn": [
+		"«(Перехват) Первая цепь наступления противника рассеяна артиллерией.»",
+		"«(Перехват) Вражеская пехота залегла под пулеметным огнем.»",
+		"«(Перехват) Передовые группы противника несут критические потери на фланге.»",
+		"«(Перехват) Батальон врага остановлен на противотанковом рву.»",
+		"«(Перехват) Вражеская рота отступает, бросая тяжелое вооружение.»",
+		"«(Перехват) Вражеские позиции на переднем крае перепаханы гаубицами.»"
+	],
+	"knight": [
+		"«(Перехват) Авангард противника попал в огневой мешок на шоссе.»",
+		"«(Перехват) Колонна снабжения противника сожжена дотла.»",
+		"«(Перехват) Мобильная бронегруппа врага разбита в приграничном районе!»",
+		"«(Перехват) Моторизованный полк потерял связь со штабом направления!»",
+		"«(Перехват) Разведывательный батальон противника попал в окружение!»"
+	],
+	"bishop": [
+		"«(Перехват) Подавлена дальнобойная батарея противника на высоте 204.»",
+		"«(Перехват) Вражеский пункт управления огнем уничтожен.»",
+		"«(Перехват) Станция радиоэлектронной борьбы врага выведена из строя!»",
+		"«(Перехват) Тяжелые расчеты противника разбиты прямым попаданием!»"
+	],
+	"rook": [
+		"«(Перехват) ТЯЖЕЛЫЙ БРОНЕТАРАН ВРАГА РАЗОРВАН В КЛОЧЬЯ! ВЗРЫВ БОЕКОМПЛЕКТА!»",
+		"«(Перехват) Опорная крепость противника превращена в лунный кратер.»",
+		"«(Перехват) Главный рубеж обороны противника сокрушен! Провал фронта!»",
+		"«(Перехват) Железобетонный форт противника полностью разрушен авиаударом!»"
+	],
+	"queen": [
+		"«(Перехват) ГЛАВНЫЙ БУНКЕР КОМАНДОВАНИЯ ВРАГА УНИЧТОЖЕН СТРАТЕГИЧЕСКИМ УДАРОМ!»",
+		"«(Перехват) У них паника в эфире! Вражеский фронт распадается на части!.. Но какой ценой?..»",
+		"«(Перехват) ГЕНЕРАЛЬНЫЙ ШТАБ ПРОТИВНИКА СТЕРТ С ЛИЦА ЗЕМЛИ! У НИХ ПОЛНЫЙ ХАОС!»"
+	],
+	"king": [
+		"«(Перехват) ВСЕ ЧАСТОТЫ ПРОТИВНИКА ЗАМОЛКЛИ. ВРАГ УНИЧТОЖЕН. МИР СГОРЕЛ...»"
+	]
+}
+
+# Параметры тряски камеры (Screen Shake при взятиях и стуках без искажения осей вращения)
 var _trauma: float = 0.0
 var _shake_decay: float = 2.8        # Базовая скорость затухания
 var _current_shake_decay: float = 2.8
 var _base_max_shake_offset: float = 0.045 # Базовое смещение в метрах
 var _current_max_shake_offset: float = 0.045
-var _current_max_roll: float = 0.0   # Дополнительный крен при сильной тряске
 
 func _get_event_bus() -> Node:
 	if not is_inside_tree():
@@ -71,6 +136,10 @@ func _ready() -> void:
 			bus.piece_captured.connect(_on_piece_captured)
 		if bus.has_signal("door_knock_triggered"):
 			bus.door_knock_triggered.connect(_on_door_knock_triggered)
+		if bus.has_signal("seismic_shock_triggered"):
+			bus.seismic_shock_triggered.connect(_on_seismic_shock_triggered)
+		if bus.has_signal("outside_stage_changed"):
+			bus.outside_stage_changed.connect(_on_outside_stage_changed)
 
 func _setup_audio_listener() -> void:
 	if camera != null and camera.get_node_or_null("AudioListener3D") == null:
@@ -90,44 +159,33 @@ func _setup_hud() -> void:
 	root_ctrl.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	root_ctrl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	canvas.add_child(root_ctrl)
-	
-	_hud_prompt = Label.new()
-	_hud_prompt.name = "HudPrompt"
-	_hud_prompt.text = ""
-	_hud_prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_hud_prompt.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_hud_prompt.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
-	_hud_prompt.offset_top = -65.0
-	_hud_prompt.offset_bottom = -20.0
-	_hud_prompt.add_theme_font_size_override("font_size", 20)
-	_hud_prompt.add_theme_color_override("font_color", Color(0.9, 0.9, 0.85, 0.9))
-	_hud_prompt.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
-	_hud_prompt.add_theme_constant_override("shadow_offset_x", 1)
-	_hud_prompt.add_theme_constant_override("shadow_offset_y", 1)
-	_hud_prompt.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	root_ctrl.add_child(_hud_prompt)
 
-	# Радио-сводка военных потерь (субтитры внизу экрана)
+	# Радио-сводка военных потерь (субтитры внизу экрана с контрастной обводкой)
 	_radio_subtitle_label = Label.new()
 	_radio_subtitle_label.name = "RadioSubtitle"
 	_radio_subtitle_label.text = ""
 	_radio_subtitle_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_radio_subtitle_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_radio_subtitle_label.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
-	_radio_subtitle_label.offset_left = 40.0
-	_radio_subtitle_label.offset_right = -40.0
-	_radio_subtitle_label.offset_top = -145.0
-	_radio_subtitle_label.offset_bottom = -75.0
+	_radio_subtitle_label.offset_left = 60.0
+	_radio_subtitle_label.offset_right = -60.0
+	_radio_subtitle_label.offset_top = -150.0
+	_radio_subtitle_label.offset_bottom = -70.0
 	_radio_subtitle_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_radio_subtitle_label.add_theme_font_size_override("font_size", 22)
-	_radio_subtitle_label.add_theme_color_override("font_color", Color(1.0, 0.84, 0.35, 1.0))
-	_radio_subtitle_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 1.0))
-	_radio_subtitle_label.add_theme_constant_override("shadow_offset_x", 2)
-	_radio_subtitle_label.add_theme_constant_override("shadow_offset_y", 2)
-	_radio_subtitle_label.add_theme_color_override("font_outline_color", Color(0.04, 0.04, 0.04, 0.95))
-	_radio_subtitle_label.add_theme_constant_override("outline_size", 5)
 	_radio_subtitle_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_radio_subtitle_label.modulate.a = 0.0
+
+	var settings = LabelSettings.new()
+	settings.font_size = 23
+	settings.font_color = Color(1.0, 0.88, 0.35, 1.0)
+	# Мощная четкая черная обводка для безупречной читаемости на любом фоне
+	settings.outline_size = 8
+	settings.outline_color = Color(0.02, 0.02, 0.02, 1.0)
+	settings.shadow_size = 4
+	settings.shadow_color = Color(0.0, 0.0, 0.0, 0.95)
+	settings.shadow_offset = Vector2(2, 2)
+	_radio_subtitle_label.label_settings = settings
+
 	root_ctrl.add_child(_radio_subtitle_label)
 
 func _find_chess_board() -> void:
@@ -168,35 +226,73 @@ func _unhandled_input(event: InputEvent) -> void:
 func _process(delta: float) -> void:
 	_update_camera_shake(delta)
 
-## Применение импульса тряски камеры
-func apply_camera_shake(amount: float = 0.6, decay_rate: float = 2.8, max_offset: float = 0.045, max_roll: float = 0.0) -> void:
+## Применение импульса тряски экрана (Screen Shake)
+func apply_camera_shake(amount: float = 0.6, decay_rate: float = 2.8, max_offset: float = 0.045) -> void:
 	_trauma = clampf(_trauma + amount, 0.0, 1.0)
 	_current_shake_decay = decay_rate
 	_current_max_shake_offset = maxf(_current_max_shake_offset, max_offset)
-	_current_max_roll = maxf(_current_max_roll, max_roll)
 
-## Показ радио-сводки военных потерь (субтитры внизу экрана)
-func show_radio_report(piece_type: String) -> void:
+## Показ радио-сводки военных потерь (субтитры внизу экрана без повторений)
+## is_white: true — потери Белых (свои), false — радиоперехват потерь Черных (враг)
+func show_radio_report(piece_type: String, is_white: bool = true) -> void:
 	if _radio_subtitle_label == null or not is_inside_tree():
 		return
 		
-	var pool: Array = RADIO_REPORTS_WHITE.get(piece_type, [])
+	var pool_dict: Dictionary = RADIO_REPORTS_WHITE if is_white else RADIO_REPORTS_BLACK
+	var unused_dict: Dictionary = _unused_radio_reports if is_white else _unused_radio_reports_black
+	
+	var pool: Array = pool_dict.get(piece_type, [])
 	if pool.is_empty():
 		return
 		
-	var text_line: String = pool[randi() % pool.size()]
+	# Ротация уникальных строк без повторов подряд
+	if not unused_dict.has(piece_type) or unused_dict[piece_type].is_empty():
+		var copy: Array = pool.duplicate()
+		copy.shuffle()
+		unused_dict[piece_type] = copy
+		
+	var queue: Array = unused_dict[piece_type]
+	var text_line: String = queue.pop_back()
 	
-	# Цветовая кодировка степени тревоги в зависимости от ранга фигуры
-	match piece_type:
-		"queen":
-			_radio_subtitle_label.add_theme_color_override("font_color", Color(1.0, 0.28, 0.28, 1.0))
-		"rook":
-			_radio_subtitle_label.add_theme_color_override("font_color", Color(1.0, 0.65, 0.25, 1.0))
-		"knight", "bishop":
-			_radio_subtitle_label.add_theme_color_override("font_color", Color(1.0, 0.88, 0.35, 1.0))
-		_:
-			_radio_subtitle_label.add_theme_color_override("font_color", Color(0.95, 0.90, 0.75, 1.0))
+	# Цветовая кодировка степени тревоги в зависимости от ранга фигуры и стороны
+	if _radio_subtitle_label.label_settings != null:
+		if is_white:
+			match piece_type:
+				"queen":
+					_radio_subtitle_label.label_settings.font_color = Color(1.0, 0.28, 0.28, 1.0)
+				"rook":
+					_radio_subtitle_label.label_settings.font_color = Color(1.0, 0.65, 0.25, 1.0)
+				"knight", "bishop":
+					_radio_subtitle_label.label_settings.font_color = Color(1.0, 0.88, 0.35, 1.0)
+				_:
+					_radio_subtitle_label.label_settings.font_color = Color(0.95, 0.90, 0.75, 1.0)
+		else:
+			# Радиоперехваты эфира противника: отличительный технологичный спектр
+			match piece_type:
+				"queen":
+					_radio_subtitle_label.label_settings.font_color = Color(1.0, 0.40, 0.35, 1.0)
+				"rook":
+					_radio_subtitle_label.label_settings.font_color = Color(1.0, 0.70, 0.20, 1.0)
+				"knight", "bishop":
+					_radio_subtitle_label.label_settings.font_color = Color(0.40, 0.88, 0.95, 1.0)
+				_:
+					_radio_subtitle_label.label_settings.font_color = Color(0.50, 0.95, 0.65, 1.0)
 			
+	_display_radio_text(text_line)
+
+## Прямой вывод радиоперехвата эфира противника
+func show_enemy_radio_intercept(piece_type: String) -> void:
+	show_radio_report(piece_type, false)
+
+## Вывод произвольного радио-сообщения (для макро-стадий и сюжетных моментов)
+func show_custom_radio_message(msg: String, color: Color = Color(0.50, 0.95, 0.65, 1.0)) -> void:
+	if _radio_subtitle_label == null or not is_inside_tree():
+		return
+	if _radio_subtitle_label.label_settings != null:
+		_radio_subtitle_label.label_settings.font_color = color
+	_display_radio_text(msg)
+
+func _display_radio_text(text_line: String) -> void:
 	_radio_subtitle_label.text = text_line
 	_radio_subtitle_label.visible_ratio = 1.0
 	_radio_subtitle_label.modulate.a = 0.15
@@ -214,39 +310,93 @@ func show_radio_report(piece_type: String) -> void:
 
 ## Обработчик взятия фигуры (сотрясение комнаты и радио-сводка потерь)
 func _on_piece_captured(piece_type: String, is_white: bool) -> void:
+	var piece_key: String = piece_type.to_lower()
 	if is_white:
-		var piece_key: String = piece_type.to_lower()
 		match piece_key:
 			"pawn":
-				apply_camera_shake(0.20, 3.2, 0.035, 0.0)
+				apply_camera_shake(0.20, 3.2, 0.035)
 			"knight", "bishop":
-				apply_camera_shake(0.40, 2.5, 0.055, 0.015)
+				apply_camera_shake(0.40, 2.5, 0.055)
 			"rook":
-				apply_camera_shake(0.65, 2.0, 0.085, 0.035)
+				apply_camera_shake(0.65, 2.0, 0.085)
 			"queen":
-				# Катастрофа при потере Ферзя: камера трясется ОЧЕНЬ сильно (максимальная травма, долгое затухание, амплитуда 14см и крен)
-				apply_camera_shake(1.0, 0.85, 0.14, 0.07)
+				# Катастрофа при потере Ферзя: мощнейшая тряска (максимальная травма, долгое затухание, смещение 15 см)
+				apply_camera_shake(1.0, 0.85, 0.15)
 			_:
-				apply_camera_shake(0.30, 2.8, 0.045, 0.0)
-		show_radio_report(piece_key)
+				apply_camera_shake(0.30, 2.8, 0.045)
+		show_radio_report(piece_key, true)
 	else:
-		# Взятие черной фигуры игроком: отдача удара без панических сводок
-		apply_camera_shake(0.30, 2.8, 0.045, 0.0)
+		_handle_enemy_piece_loss(piece_key)
+
+## Обработка потерь Черных (Враг): радиоперехват + сейсмические эффекты согласно EVENTS_DESIGN.md
+func _handle_enemy_piece_loss(piece_key: String) -> void:
+	if _delayed_shake_tween and _delayed_shake_tween.is_valid():
+		_delayed_shake_tween.kill()
+		_delayed_shake_tween = null
+		
+	var bus = _get_event_bus()
+	var current_out_stage: int = bus.outside_stage if (bus and "outside_stage" in bus) else 0
+	
+	if piece_key == "queen":
+		# Гибель вражеского Ферзя — ключевое стратегическое событие партии, всегда транслируется в эфир
+		show_radio_report("queen", false)
+	elif current_out_stage >= 4:
+		show_custom_radio_message("«(Перехват) В радиоэфире мертвая тишина. Больше некому выходить на связь.»", Color(0.70, 0.70, 0.75, 1.0))
+	elif current_out_stage >= 3:
+		# На стадии III человеческие голоса исчезают, в эфире автоматическая номерная станция
+		show_custom_radio_message("«(Перехват) [ЭФИР 4625 кГц] ... 74 102 СЛОВО 89 21 ... МОНОТОННЫЙ ЗУММЕР ...»", Color(0.85, 0.85, 0.95, 1.0))
+	else:
+		show_radio_report(piece_key, false)
+
+	match piece_key:
+		"pawn":
+			# Едва уловимая вибрация пола спустя 0.6 секунды после взятия
+			_delayed_shake_tween = create_tween()
+			_delayed_shake_tween.tween_interval(0.6)
+			_delayed_shake_tween.tween_callback(func(): apply_camera_shake(0.15, 3.5, 0.025))
+		"knight":
+			# Дрожь стальной двери бункера и отдача
+			apply_camera_shake(0.28, 2.6, 0.045)
+		"bishop":
+			# Низкочастотный подземный толчок
+			apply_camera_shake(0.40, 2.2, 0.065)
+		"rook":
+			# Ударная волна бьет снаружи в стену — всю комнату сотрясает
+			apply_camera_shake(0.70, 1.8, 0.095)
+		"queen":
+			# Стратегический удар: Мертвая тишина на 1.2 секунды... Затем монолитный 3-секундный подземный гул
+			_delayed_shake_tween = create_tween()
+			_delayed_shake_tween.tween_interval(1.2)
+			_delayed_shake_tween.tween_callback(func(): apply_camera_shake(1.0, 0.70, 0.16))
+		_:
+			apply_camera_shake(0.30, 2.8, 0.045)
+
+## Реакция на внешние сейсмические толчки
+func _on_seismic_shock_triggered(intensity: float, is_subterranean: bool) -> void:
+	var decay: float = 1.8 if is_subterranean else 2.5
+	var offset: float = 0.07 * intensity
+	apply_camera_shake(clampf(intensity, 0.1, 1.0), decay, offset)
+
+## Реакция радио на макро-стадии разрушения внешнего мира
+func _on_outside_stage_changed(stage: int, _black_score: int) -> void:
+	match stage:
+		3:
+			show_custom_radio_message("«(Перехват) [ЭФИР 4625 кГц] ... 74 102 СЛОВО 89 21 ... МОНОТОННЫЙ ЗУММЕР ...»", Color(0.85, 0.85, 0.95, 1.0))
+		4:
+			show_custom_radio_message("«(Перехват) В радиоэфире мертвая тишина. Больше некому выходить на связь.»", Color(0.70, 0.70, 0.75, 1.0))
 
 ## Обработчик стука в дверь бункера
 func _on_door_knock_triggered(knock_level: int) -> void:
-	apply_camera_shake(0.35 * float(knock_level), 2.2, 0.05 * float(knock_level), 0.015 * float(knock_level))
+	apply_camera_shake(0.35 * float(knock_level), 2.2, 0.05 * float(knock_level))
 
-## Обновление тряски камеры со спадом
+## Обновление тряски камеры со спадом (только h_offset и v_offset в экранном пространстве, без изменения осей вращения)
 func _update_camera_shake(delta: float) -> void:
 	if _trauma <= 0.0:
 		if camera != null:
 			camera.h_offset = 0.0
 			camera.v_offset = 0.0
-			camera.rotation.z = 0.0
 		_current_shake_decay = _shake_decay
 		_current_max_shake_offset = _base_max_shake_offset
-		_current_max_roll = 0.0
 		return
 		
 	_trauma = maxf(0.0, _trauma - _current_shake_decay * delta)
@@ -255,8 +405,6 @@ func _update_camera_shake(delta: float) -> void:
 	if camera != null:
 		camera.h_offset = randf_range(-1.0, 1.0) * _current_max_shake_offset * shake_power
 		camera.v_offset = randf_range(-1.0, 1.0) * _current_max_shake_offset * shake_power
-		if _current_max_roll > 0.0:
-			camera.rotation.z = randf_range(-1.0, 1.0) * _current_max_roll * shake_power
 
 func _physics_process(delta: float) -> void:
 	# Гравитация
@@ -268,8 +416,6 @@ func _physics_process(delta: float) -> void:
 		var current_pos: Vector3 = global_position if is_inside_tree() else position
 		var horiz_dist: float = Vector2(current_pos.x, current_pos.z).distance_to(Vector2(table_world_center.x, table_world_center.z))
 		is_near_table = (horiz_dist <= table_interact_distance)
-		if _hud_prompt != null:
-			_hud_prompt.text = "[E] Сесть за шахматный стол" if is_near_table else ""
 
 	if not can_walk:
 		velocity.x = move_toward(velocity.x, 0, speed)
@@ -308,10 +454,12 @@ func _update_footsteps(input_dir: Vector2) -> void:
 		if player_steps.playing:
 			player_steps.stop()
 
-## Плавный переход камеры за шахматный стол
+## Плавный переход камеры за шахматный стол с гарантированным нулевым креном (roll = 0.0)
 func enter_board_mode() -> void:
 	if is_board_mode:
 		return
+	if head == null:
+		head = get_node_or_null("head")
 	if camera == null:
 		camera = get_node_or_null("head/Camera3D")
 	if _chess_board_node == null:
@@ -329,43 +477,54 @@ func enter_board_mode() -> void:
 	if player_steps != null and player_steps.playing:
 		player_steps.stop()
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	if _hud_prompt != null:
-		_hud_prompt.text = "[E] / [Esc] Встать из-за стола"
 	
 	if camera != null:
 		if _cam_tween and _cam_tween.is_valid():
 			_cam_tween.kill()
 		_cam_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
 		
-		# Сбрасываем остаточную тряску
+		# Сбрасываем смещения экрана от тряски
 		_trauma = 0.0
 		camera.h_offset = 0.0
 		camera.v_offset = 0.0
-		camera.rotation.z = 0.0
 		
 		var start_trans: Transform3D = camera.global_transform
 		var start_origin: Vector3 = start_trans.origin
 		var target_origin: Vector3 = cam_marker.global_position
 		
-		# Интерполируем yaw и pitch в одной плавной траектории напрямую в точку CameraPoint (roll строго = 0)
-		var start_euler: Vector3 = start_trans.basis.orthonormalized().get_euler(EULER_ORDER_YXZ)
-		var target_euler: Vector3 = cam_marker.global_transform.basis.orthonormalized().get_euler(EULER_ORDER_YXZ)
+		var start_basis: Basis = start_trans.basis.orthonormalized()
+		var target_basis: Basis = cam_marker.global_transform.basis.orthonormalized()
+		
+		var start_euler: Vector3 = start_basis.get_euler(EULER_ORDER_YXZ)
+		var target_euler: Vector3 = target_basis.get_euler(EULER_ORDER_YXZ)
 		
 		var start_yaw: float = start_euler.y
 		var diff_yaw: float = wrapf(target_euler.y - start_euler.y, -PI, PI)
 		var start_pitch: float = start_euler.x
 		var target_pitch: float = target_euler.x
 		
+		# Плавно выравниваем ориентацию тела и головы игрока строго по столу
+		var start_player_yaw: float = rotation.y
+		var diff_player_yaw: float = wrapf(target_euler.y - start_player_yaw, -PI, PI)
+		var start_head_pitch: float = head.rotation.x if head != null else 0.0
+		
 		_cam_tween.tween_method(func(t: float):
 			var cur_origin: Vector3 = start_origin.lerp(target_origin, t)
 			var cur_yaw: float = start_yaw + diff_yaw * t
 			var cur_pitch: float = lerpf(start_pitch, target_pitch, t)
+			# roll строго равен 0.0, масштаб строго (1, 1, 1)
 			var cur_basis: Basis = Basis.from_euler(Vector3(cur_pitch, cur_yaw, 0.0), EULER_ORDER_YXZ)
 			camera.global_transform = Transform3D(cur_basis, cur_origin)
+			
+			rotation.y = start_player_yaw + diff_player_yaw * t
+			if head != null:
+				head.rotation.x = lerpf(start_head_pitch, 0.0, t)
 		, 0.0, 1.0, 0.75)
+		
 		_cam_tween.chain().tween_callback(func():
 			if camera != null and cam_marker != null and is_instance_valid(cam_marker):
-				camera.global_transform = cam_marker.global_transform
+				var norm_target_basis: Basis = Basis.from_euler(Vector3(target_pitch, target_euler.y, 0.0), EULER_ORDER_YXZ)
+				camera.global_transform = Transform3D(norm_target_basis, cam_marker.global_position)
 		)
 	
 	var bus = _get_event_bus()
@@ -373,7 +532,6 @@ func enter_board_mode() -> void:
 		bus.camera_mode_changed.emit(true)
 		bus.player_made_action.emit()
 	elif _chess_board_node.has_method("_on_camera_mode_changed"):
-		# Прямой вызов если шина не зарегистрирована (например, в изолированных тестах)
 		_chess_board_node._on_camera_mode_changed(true)
 
 ## Возврат камеры обратно к телу персонажа
@@ -384,13 +542,17 @@ func exit_board_mode() -> void:
 	is_board_mode = false
 	can_walk = true
 	can_move = true
-	if _hud_prompt != null:
-		_hud_prompt.text = ""
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	
 	if camera != null:
 		if _cam_tween and _cam_tween.is_valid():
 			_cam_tween.kill()
+		_cam_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+		_cam_tween.tween_property(camera, "transform", Transform3D.IDENTITY, 0.65)
+		_cam_tween.chain().tween_callback(func():
+			if camera != null:
+				camera.transform = Transform3D.IDENTITY
+		)
 		_cam_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
 		_cam_tween.tween_property(camera, "transform", Transform3D.IDENTITY, 0.65)
 	

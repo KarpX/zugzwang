@@ -882,13 +882,13 @@ static func choose_best_move(
 	
 	# 2. Определение динамических параметров поиска (глубина, случайность, лимит времени)
 	var max_depth: int = 3
-	var randomness: float = 0.0
+	var _randomness: float = 0.0
 	var time_limit_ms: int = 800
 	
 	if playthrough == 1:
 		# Первое прохождение: Сложность высокая и НЕ падает ниже Hard!
 		max_depth = 4
-		randomness = 0.0
+		_randomness = 0.0
 		time_limit_ms = 1000
 		
 		# Если игрок вдруг получает преимущество по фигурам или позиции — бот включает максимальную ярость
@@ -899,16 +899,16 @@ static func choose_best_move(
 		# Второе прохождение: Сложность начинается со средней (Medium)
 		# Бот поддается, слабее игрока, но пытается выжить
 		max_depth = 2
-		randomness = 0.16
+		_randomness = 0.16
 		time_limit_ms = 400
 		
 		# Если игрок сильно впереди, бот чуть подтягивает выживание, но не превышает depth 3
 		if material_diff > 300 or eval_white > 350:
 			max_depth = 3
-			randomness = 0.08
+			_randomness = 0.08
 			time_limit_ms = 600
 		elif material_diff < -300: # если игрок отстает, бот делает ошибки охотнее
-			randomness = 0.25
+			_randomness = 0.25
 			
 	# Сброс вспомогательных структур
 	killer_moves.clear()

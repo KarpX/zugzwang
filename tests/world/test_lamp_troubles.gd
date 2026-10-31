@@ -107,6 +107,63 @@ func _run_tests() -> void:
 	assert(hanging_lamp.light_intensity_ratio == 1.0, "Свет должен вернуться на 1.0")
 	print("[PASS] Тест 8: Восстановление освещения и сброс флага активности перебоя корректны")
 	
+	# 9. ТЕСТ: Лампа не качается и не скрипит до 2 стадии, запускается на 2 стадии тревоги
+	hanging_lamp._on_game_reset(1)
+	assert(hanging_lamp.is_swinging == false, "До 2 стадии тревоги лампа не должна качаться")
+	assert(hanging_lamp.base_amplitude == 0.0, "До 2 стадии тревоги base_amplitude равна 0.0")
+	assert(hanging_lamp._squeak_audio_player == null or not hanging_lamp._squeak_audio_player.playing, "До 2 стадии тревоги лампа не скрипит")
+	
+	# При убийстве фигуры лампа качается и скрипит
+	bus.piece_captured.emit("pawn", true)
+	assert(hanging_lamp.is_swinging == true, "При убийстве пешки лампа должна качаться")
+	assert(hanging_lamp._squeak_audio_player.playing == true, "При убийстве пешки лампа должна скрипеть")
+	
+	# Наступление 2 стадии тревоги активирует постоянное качание и скрип
+	bus.escalation_stage_changed.emit(2, 4)
+	assert(hanging_lamp.current_stage == 2, "Стадия эскалации 2 зафиксирована")
+	assert(hanging_lamp.is_swinging == true, "На 2 стадии тревоги лампа непрерывно качается")
+	assert(hanging_lamp._squeak_audio_player.playing == true, "На 2 стадии тревоги лампа фоново скрипит")
+	print("[PASS] Тест 9: Лампа не качается до 2 стадии, качается/скрипит при убийстве фигур и на 2 стадии тревоги")
+	
+	# 10. ТЕСТ: На 3 стадии пропадание света раз в случайное время 15..45с
+	hanging_lamp._on_trouble_finished()
+	bus.escalation_stage_changed.emit(3, 8)
+	assert(hanging_lamp.current_stage == 3, "Стадия эскалации 3 зафиксирована")
+	assert(hanging_lamp._stage3_timer != null, "Таймер случайного перебоя на 3 стадии успешно создан")
+	
+	# Срабатывание случайного перебоя на 3 стадии
+	hanging_lamp._on_stage3_flicker_timeout()
+	assert(hanging_lamp._is_trouble_playing == true, "Случайный перебой на 3 стадии активировал пропадание света")
+	assert(bus.is_lamp_trouble_active == true, "EventBus зафиксировал активность перебоя на 3 стадии")
+	assert(hanging_lamp._stage3_timer != null, "Следующий таймер 15..45с успешно запланирован")
+	print("[PASS] Тест 10: 3 стадия активирует случайные пропадания света (15..45с) как при гибели фигур")
+	
+	# 11. ТЕСТ: На 4 стадии свет красный и непрерывно анимирован (сбавляет мощность -> возвращает)
+	hanging_lamp._on_trouble_finished()
+	bus.escalation_stage_changed.emit(4, 12)
+	assert(hanging_lamp.current_stage == 4, "Стадия эскалации 4 зафиксирована")
+	assert(hanging_lamp._stage3_timer == null, "Таймер 3 стадии отключен на 4 стадии")
+	assert(hanging_lamp._omni_light.light_color.r > 0.8 and hanging_lamp._omni_light.light_color.g < 0.2 and hanging_lamp._omni_light.light_color.b < 0.2, "Цвет света лампы на 4 стадии стал красным (R=%.2f, G=%.2f, B=%.2f)" % [hanging_lamp._omni_light.light_color.r, hanging_lamp._omni_light.light_color.g, hanging_lamp._omni_light.light_color.b])
+	assert(hanging_lamp._stage4_pulse_tween != null and hanging_lamp._stage4_pulse_tween.is_valid(), "Бесконечная пульсирующая анимация мощности запущена")
+	
+	# Проверяем фазы пульсации мощности
+	hanging_lamp._stage4_pulse_tween.custom_step(0.9)
+	assert(hanging_lamp.light_intensity_ratio < 0.35, "Первая фаза анимации: сбавляет мощность (ratio=%.2f)" % hanging_lamp.light_intensity_ratio)
+	hanging_lamp._stage4_pulse_tween.custom_step(0.9)
+	assert(hanging_lamp.light_intensity_ratio > 0.95, "Вторая фаза анимации: возвращает мощность (ratio=%.2f)" % hanging_lamp.light_intensity_ratio)
+	hanging_lamp._stage4_pulse_tween.custom_step(0.9)
+	assert(hanging_lamp.light_intensity_ratio < 0.35, "Третья фаза (повтор цикла): снова сбавляет мощность (ratio=%.2f)" % hanging_lamp.light_intensity_ratio)
+	print("[PASS] Тест 11: 4 стадия включает красный свет и непрерывную пульсацию мощности (сбавляет -> возвращает)")
+	
+	# 12. ТЕСТ: Сброс игры возвращает нормальный свет и гасит красный пульс
+	bus.reset_game_state(1)
+	assert(hanging_lamp.current_stage == 1, "Стадия сброшена на 1")
+	assert(hanging_lamp._stage4_pulse_tween == null, "Пульсирующий твин 4 стадии остановлен")
+	assert(hanging_lamp._omni_light.light_color == hanging_lamp._default_light_color, "Цвет лампы возвращен к исходному теплому")
+	assert(hanging_lamp.light_intensity_ratio == 1.0, "Мощность света восстановлена в 1.0")
+	assert(hanging_lamp.is_swinging == false, "Качание выключено на 1 стадии")
+	print("[PASS] Тест 12: Сброс игры (reset_game_state) корректно возвращает исходный свет и выключает красный пульс")
+	
 	room.free()
 	print("--- [Lamp Troubles Test Suite] ВСЕ ТЕСТЫ УСПЕШНО ПРОЙДЕНЫ ---")
 	quit(0)

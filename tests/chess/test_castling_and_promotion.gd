@@ -13,10 +13,12 @@ func _run_tests() -> void:
 	_test_queenside_castling()
 	_test_castling_restrictions()
 	_test_pawn_promotion_logic()
-	_test_pawn_promotion_3d_mesh()
-	_test_promotion_dialog()
+	await _test_pawn_promotion_3d_mesh()
+	await _test_promotion_dialog()
 	_test_pawn_lifting_on_promotion()
 	_test_deselect_sound_on_switch()
+	await _test_ai_responds_after_promotion()
+	await _test_player_blocked_while_effect_active()
 	
 	print("--- [Castling & Promotion Test Suite] ВСЕ ТЕСТЫ УСПЕШНО ПРОЙДЕНЫ ---")
 	quit(0)
@@ -245,3 +247,80 @@ func _test_deselect_sound_on_switch() -> void:
 	
 	board.free()
 	print("[PASS] Тест 8: Звук отмены выбора воспроизводится при выборе другой фигуры")
+
+## Тест 9: ИИ отвечает ходом после превращения пешки в ферзя и не зависает
+func _test_ai_responds_after_promotion() -> void:
+	var board_scene = load("res://scenes/chess/chess_board.tscn")
+	var board: ChessBoardView = board_scene.instantiate()
+	root.add_child(board)
+	await process_frame
+	
+	# Очищаем доску и создаем ситуацию превращения
+	for p in board.piece_nodes.values():
+		p.queue_free()
+	board.piece_nodes.clear()
+	for x in 8:
+		for y in 8:
+			board.logic.grid[x][y] = null
+			
+	# Белый король (4, 0), черная ладья (7, 7), черный король (0, 7), белая пешка (4, 6)
+	board.logic.grid[4][0] = { "type": "king", "is_white": true, "has_moved": true }
+	board.logic.grid[0][7] = { "type": "king", "is_white": false, "has_moved": true }
+	board.logic.grid[7][7] = { "type": "rook", "is_white": false, "has_moved": true }
+	board.logic.grid[4][6] = { "type": "pawn", "is_white": true, "has_moved": true }
+	
+	board._spawn_piece_at(Vector2i(4, 0), "king", true)
+	board._spawn_piece_at(Vector2i(0, 7), "king", false)
+	board._spawn_piece_at(Vector2i(7, 7), "rook", false)
+	board._spawn_piece_at(Vector2i(4, 6), "pawn", true)
+	board.logic.is_white_turn = true
+	board.is_active = true
+	
+	# Ход пешки на клетку превращения e8 (4, 7)
+	board._execute_player_move(Vector2i(4, 6), Vector2i(4, 7))
+	await process_frame
+	
+	# Игрок выбирает превращение в ферзя
+	board._on_promotion_selected(Vector2i(4, 7), board.piece_nodes.get(Vector2i(4, 7)), "queen")
+	assert(board.logic.get_piece(Vector2i(4, 7))["type"] == "queen", "Пешка стала ферзём")
+	assert(board.logic.is_white_turn == false, "Ход перешел Черным")
+	
+	# Ждем расчета и ответа ИИ
+	var ai_responded: bool = false
+	for i in range(120):
+		await process_frame
+		if board.logic.move_count >= 2:
+			ai_responded = true
+			break
+			
+	assert(ai_responded == true, "ИИ должен сделать ответный ход и не зависнуть после превращения пешки")
+	board.free()
+	print("[PASS] Тест 9: ИИ корректно отвечает ходом после превращения пешки в ферзя (без зависания)")
+
+## Тест 10: Блокировка ходов игрока, пока не завершился эффект
+func _test_player_blocked_while_effect_active() -> void:
+	var board_scene = load("res://scenes/chess/chess_board.tscn")
+	var board: ChessBoardView = board_scene.instantiate()
+	root.add_child(board)
+	await process_frame
+	
+	board.is_active = true
+	board.logic.is_white_turn = true
+	assert(board.is_effect_active() == false, "В спокойном состоянии эффектов нет")
+	
+	# 1. Активируем эффект перебоя со светом
+	board._is_light_trouble_active = true
+	assert(board.is_effect_active() == true, "Перебой со светом должен считаться активным эффектом")
+	
+	# Пытаемся кликнуть на пешку во время перебоя
+	board._on_cell_clicked(Vector2i(0, 1))
+	assert(board.selected_pos == Vector2i(-1, -1), "Игрок НЕ может выбрать фигуру во время перебоя со светом")
+	
+	# 2. Окончание перебоя
+	board._on_lamp_trouble_finished()
+	assert(board.is_effect_active() == false, "После окончания перебоя эффект снимается")
+	board._on_cell_clicked(Vector2i(0, 1))
+	assert(board.selected_pos == Vector2i(0, 1), "После окончания перебоя игрок снова может сделать ход")
+	
+	board.free()
+	print("[PASS] Тест 10: Игрок заблокирован от совершения ходов, пока не завершился эффект")

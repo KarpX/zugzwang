@@ -1,4 +1,17 @@
-[gd_resource type="AudioBusLayout" format=3 uid="uid://cygyeg5bxekdb"]
+[gd_resource type="AudioBusLayout" load_steps=3 format=3 uid="uid://cygyeg5bxekdb"]
+
+[sub_resource type="AudioEffectLowPassFilter" id="AudioEffectLowPassFilter_outside"]
+resource_name = "LowPassFilter"
+cutoff_hz = 1000.0
+resonance = 0.5
+
+[sub_resource type="AudioEffectReverb" id="AudioEffectReverb_outside"]
+resource_name = "Reverb"
+room_size = 0.35
+damping = 0.6
+spread = 0.5
+dry = 0.7
+wet = 0.4
 
 [resource]
 bus/1/name = &"Sound"
@@ -13,3 +26,13 @@ bus/2/mute = false
 bus/2/bypass_fx = false
 bus/2/volume_db = 0.0
 bus/2/send = &"Master"
+bus/3/name = &"Outside"
+bus/3/solo = false
+bus/3/mute = false
+bus/3/bypass_fx = false
+bus/3/volume_db = 0.0
+bus/3/send = &"Master"
+bus/3/effect/0/effect = SubResource("AudioEffectLowPassFilter_outside")
+bus/3/effect/0/enabled = true
+bus/3/effect/1/effect = SubResource("AudioEffectReverb_outside")
+bus/3/effect/1/enabled = true

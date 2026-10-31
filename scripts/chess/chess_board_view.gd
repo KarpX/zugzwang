@@ -57,6 +57,7 @@ var _precomputed_ai_move: Dictionary = {}
 var _is_ai_calculating: bool = false
 var _white_animation_finished: bool = false
 var _ai_turn_delay_finished: bool = false
+var _is_white_moving: bool = false
 
 # Состояние превращения пешки
 var _promoting_pos: Vector2i = Vector2i(-1, -1)
@@ -114,10 +115,13 @@ func _ready() -> void:
 		bus.lamp_flicker_triggered.connect(_on_lamp_flicker_triggered)
 	if bus and bus.has_signal("lamp_trouble_finished"):
 		bus.lamp_trouble_finished.connect(_on_lamp_trouble_finished)
+	if bus and bus.has_signal("seismic_shock_triggered"):
+		bus.seismic_shock_triggered.connect(_on_seismic_shock_triggered)
 
 ## Синхронизация подсветки доски с перебоем света подвесной лампы
 func _on_lamp_flicker_triggered(sound_idx: int, _duration: float) -> void:
 	_is_light_trouble_active = true
+	clear_selection()
 	if board_light == null:
 		return
 	if _board_light_tween and _board_light_tween.is_valid():
@@ -219,6 +223,19 @@ func _on_lamp_trouble_finished() -> void:
 	if is_ai_thinking and not logic.is_game_over and not logic.is_white_turn:
 		var resume_timer = get_tree().create_timer(0.35)
 		resume_timer.timeout.connect(_execute_ai_turn)
+
+## Подпрыгивание фигур на доске при подземном толчке (Слон, Ладья, Ферзь противника)
+func _on_seismic_shock_triggered(intensity: float, _is_subterranean: bool) -> void:
+	if intensity < 0.35:
+		return
+	var jump_height: float = clampf(intensity * 0.045, 0.015, 0.05)
+	for cell in piece_nodes.keys():
+		var piece = piece_nodes[cell]
+		if piece is ChessPiece3D and is_instance_valid(piece):
+			var base: float = piece.base_y
+			var t = piece.create_tween().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+			t.tween_property(piece, "position:y", base + jump_height, 0.07)
+			t.set_ease(Tween.EASE_IN).tween_property(piece, "position:y", base, 0.11)
 
 func _exit_tree() -> void:
 	_cleanup_ai_thread()
@@ -413,6 +430,9 @@ func restart_game(next_playthrough: int = -1) -> void:
 		_promoting_node = null
 		
 	is_ai_thinking = false
+	_is_white_moving = false
+	_white_animation_finished = false
+	_ai_turn_delay_finished = false
 	
 	if pieces_container == null:
 		pieces_container = get_node_or_null("Pieces")
@@ -572,6 +592,19 @@ func _on_camera_mode_changed(is_board_mode: bool) -> void:
 	if not is_active:
 		clear_selection()
 
+## Проверка, активен ли какой-либо эффект (перебой со светом, блэкаут, полет фигуры игрока, окно превращения)
+func is_effect_active() -> bool:
+	if _is_light_trouble_active:
+		return true
+	var bus = _get_event_bus()
+	if bus != null and bus.get("is_lamp_trouble_active") == true:
+		return true
+	if _is_white_moving:
+		return true
+	if _promotion_dialog != null and is_instance_valid(_promotion_dialog):
+		return true
+	return false
+
 ## Обработка ввода мыши по доске
 func _unhandled_input(event: InputEvent) -> void:
 	if _promotion_dialog != null and is_instance_valid(_promotion_dialog):
@@ -596,7 +629,7 @@ func _unhandled_input(event: InputEvent) -> void:
 					return
 		return
 
-	if not is_active or is_ai_thinking or logic.is_game_over:
+	if not is_active or is_ai_thinking or logic.is_game_over or is_effect_active():
 		return
 		
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
@@ -605,6 +638,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		cancel_selection()
 
 func _handle_board_click() -> void:
+	if not is_active or is_ai_thinking or logic.is_game_over or is_effect_active() or not logic.is_white_turn:
+		return
+
 	var viewport = get_viewport()
 	var camera = viewport.get_camera_3d()
 	if not camera:
@@ -634,6 +670,9 @@ func _handle_board_click() -> void:
 	_on_cell_clicked(cell)
 
 func _on_cell_clicked(cell: Vector2i) -> void:
+	if not is_active or is_ai_thinking or logic.is_game_over or is_effect_active() or not logic.is_white_turn:
+		return
+
 	var piece_data = logic.get_piece(cell)
 	
 	# Если кликнули на свою фигуру (Белые)
@@ -759,8 +798,6 @@ func _cleanup_ai_thread() -> void:
 		_ai_thread.wait_to_finish()
 	_ai_thread = null
 	_is_ai_calculating = false
-	_white_animation_finished = false
-	_ai_turn_delay_finished = false
 	_precomputed_ai_move.clear()
 
 ## Запуск фонового просчета хода черных (выполняется ПАРАЛЛЕЛЬНО с анимацией полета фигуры игрока)
@@ -852,10 +889,12 @@ func _execute_player_move(from_pos: Vector2i, to_pos: Vector2i) -> void:
 	# СБРАСЫВАЕМ ФЛАГИ ГОТОВНОСТИ И ЗАПУСКАЕМ РАСЧЕТ ИИ НЕ ДОЖИДАЯСЬ ОКОНЧАНИЯ АНИМАЦИИ
 	_white_animation_finished = false
 	_ai_turn_delay_finished = false
+	_is_white_moving = true
 	if not is_pawn_promotion and not move_res["is_checkmate"]:
 		_start_precomputing_ai_move()
 	
 	var on_move_finished = func():
+		_is_white_moving = false
 		if is_capture:
 			_play_capture_sound(target_world_pos)
 			if victim_node:
@@ -1215,9 +1254,10 @@ func _on_promotion_selected(cell: Vector2i, piece_node: ChessPiece3D, chosen_typ
 		return
 		
 	# 3. Передаем ход черному ИИ с параллельным фоновым просчетом
-	_white_animation_finished = true
+	_is_white_moving = false
 	_ai_turn_delay_finished = false
 	_start_precomputing_ai_move()
+	_white_animation_finished = true
 	var delay: float = 0.02 if is_fast_mode else ai_turn_delay
 	if delay <= 0.01:
 		_ai_turn_delay_finished = true

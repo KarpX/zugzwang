@@ -64,8 +64,26 @@ signal escalation_stage_changed(stage: int, total_losses: int)
 ## Обновление очков ценности армий (is_white, new_score от 40 до 0)
 signal score_updated(is_white: bool, new_score: int)
 
+
 # ==============================================================================
-# 4. СОСТОЯНИЕ И СЧЕТЧИКИ (State Helpers)
+# 4. СОБЫТИЯ ВНЕШНЕГО МИРА (Потери врага / Черные фигуры)
+# ==============================================================================
+
+## Потеря фигуры врага (piece_type, оставшийся black_score от 40 до 0)
+signal enemy_loss_triggered(piece_type: String, black_score: int)
+
+## Макро-стадия эскалации внешнего мира (0: Затишье [40-31], 1: Дыхание фронта [<=30], 2: Пожар [<=20], 3: Мертвый эфир [<=10], 4: Пустыня [<=3])
+signal outside_stage_changed(stage: int, black_score: int)
+
+## Сейсмический импульс / подземный толчок от взрывов снаружи
+signal seismic_shock_triggered(intensity: float, is_subterranean: bool)
+
+## Световой отблеск под дверью и вентиляцией от взрывов снаружи
+signal door_light_flash(color: Color, duration: float, intensity: float)
+
+
+# ==============================================================================
+# 5. СОСТОЯНИЕ И СЧЕТЧИКИ (State Helpers)
 # ==============================================================================
 
 const PIECE_VALUES: Dictionary = {
@@ -83,6 +101,7 @@ var black_losses: int = 0
 var white_score: int = 40
 var black_score: int = 40
 var current_stage: int = 1
+var outside_stage: int = 0
 var is_in_board_mode: bool = false
 var is_game_finished: bool = false
 var is_lamp_trouble_active: bool = false
@@ -105,8 +124,27 @@ func _on_piece_captured(piece_type: String, is_white: bool) -> void:
 		black_losses += 1
 		black_score = maxi(0, black_score - piece_val)
 		score_updated.emit(false, black_score)
+		enemy_loss_triggered.emit(piece_type.to_lower(), black_score)
+		_update_outside_stage()
 	
 	_update_escalation_stage()
+
+func _update_outside_stage() -> void:
+	var new_outside_stage: int = 0
+	if black_score <= 3:
+		new_outside_stage = 4
+	elif black_score <= 10:
+		new_outside_stage = 3
+	elif black_score <= 20:
+		new_outside_stage = 2
+	elif black_score <= 30:
+		new_outside_stage = 1
+	else:
+		new_outside_stage = 0
+
+	if new_outside_stage != outside_stage:
+		outside_stage = new_outside_stage
+		outside_stage_changed.emit(outside_stage, black_score)
 
 func _update_escalation_stage() -> void:
 	var new_stage: int = 1
@@ -138,6 +176,7 @@ func reset_game_state(playthrough: int = 1) -> void:
 	white_score = 40
 	black_score = 40
 	current_stage = 1
+	outside_stage = 0
 	is_game_finished = false
 	game_reset.emit(playthrough)
 	is_lamp_trouble_active = false

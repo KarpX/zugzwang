@@ -15,7 +15,7 @@ const SWING_ANGULAR_SPEED: float = TAU / SQUEAK_CYCLE_DURATION
 
 @export_group("Swinging & Squeak")
 @export var is_swinging: bool = false      ## Включить ли раскачивание
-@export var base_amplitude: float = 0.035  ## Фоновое легкое покачивание (радианы ~ 2 градуса)
+@export var base_amplitude: float = 0.0    ## Фоновое покачивание (0.0 до 2 стадии, 0.035 со 2 стадии)
 @export var swing_speed: float = SWING_ANGULAR_SPEED ## Скорость колебаний маятника, точно синхронизированная с 2.7692с
 @export var damping: float = 0.985         ## Скорость затухания внешних толчков
 @export var squeak_sound: AudioStream = preload("res://assets/sounds/metallic_squeeks.ogg")
@@ -44,6 +44,12 @@ const SWING_ANGULAR_SPEED: float = TAU / SQUEAK_CYCLE_DURATION
 		_apply_light_intensity(light_intensity_ratio)
 
 const DEFAULT_BASE_AMPLITUDE: float = 0.035
+var target_burst_amplitude: float = DEFAULT_BASE_AMPLITUDE
+var current_stage: int = 1
+
+@export_group("Stage 3 & 4 Dynamics")
+@export var stage3_min_interval: float = 15.0  ## Минимальный интервал между случайными сбоями на 3 стадии
+@export var stage3_max_interval: float = 45.0  ## Максимальный интервал между случайными сбоями на 3 стадии
 
 var _time: float = 0.0
 var _impulse_angle_x: float = 0.0
@@ -58,6 +64,11 @@ var _glow_material: StandardMaterial3D = null
 var _trouble_tween: Tween = null
 var _ambient_tween: Tween = null
 var _amplitude_tween: Tween = null
+var _stage4_pulse_tween: Tween = null
+var _stage3_timer: SceneTreeTimer = null
+var _default_light_color: Color = Color(1, 0.9411765, 0.6627451, 1)
+var _default_glow_emission_color: Color = Color.WHITE
+var _default_glow_albedo_color: Color = Color.WHITE
 var _base_ambient_db: float = -8.0
 var _is_trouble_playing: bool = false
 var _last_sound_index: int = -1
@@ -81,6 +92,10 @@ func _ready() -> void:
 			set_surface_override_material(1, _glow_material)
 			base_glow_emission = _glow_material.emission_energy_multiplier
 
+	if _glow_material:
+		_default_glow_emission_color = _glow_material.emission
+		_default_glow_albedo_color = _glow_material.albedo_color
+
 	# 2. Поиск источника света лампы
 	_omni_light = get_node_or_null("OmniLight3D") as OmniLight3D
 	if _omni_light == null:
@@ -90,6 +105,7 @@ func _ready() -> void:
 				break
 	if _omni_light:
 		base_light_energy = _omni_light.light_energy
+		_default_light_color = _omni_light.light_color
 
 	# 3. Поиск фонового гула лампы
 	_ambient_audio = get_node_or_null("AudioStreamPlayer3D") as AudioStreamPlayer3D
@@ -141,10 +157,23 @@ func _ready() -> void:
 				_on_trouble_finished()
 		)
 
-	# 6. Подключение к EventBus для реакции на смерть пешек
+	# 6. Подключение к EventBus
 	var bus = _get_event_bus()
-	if bus and bus.has_signal("piece_captured"):
-		bus.piece_captured.connect(_on_piece_captured)
+	if bus:
+		if bus.has_signal("piece_captured"):
+			bus.piece_captured.connect(_on_piece_captured)
+		if bus.has_signal("seismic_shock_triggered"):
+			bus.seismic_shock_triggered.connect(_on_seismic_shock_triggered)
+		if bus.has_signal("escalation_stage_changed"):
+			bus.escalation_stage_changed.connect(_on_escalation_stage_changed)
+		if bus.has_signal("game_reset"):
+			bus.game_reset.connect(_on_game_reset)
+			
+		var initial_stage: int = bus.current_stage if "current_stage" in bus else 1
+		var initial_losses: int = bus.total_losses if "total_losses" in bus else 0
+		_on_escalation_stage_changed(initial_stage, initial_losses)
+	else:
+		_on_escalation_stage_changed(1, 0)
 
 func _process(delta: float) -> void:
 	if not is_swinging:
@@ -182,7 +211,7 @@ func _process(delta: float) -> void:
 	# Модуляция громкости скрипа в зависимости от силы покачивания лампы
 	if _squeak_audio_player:
 		var current_amp: float = maxf(absf(z_swing), absf(x_swing))
-		var impulse_factor: float = clampf((current_amp - base_amplitude) / 0.22, 0.0, 1.0)
+		var impulse_factor: float = clampf((current_amp - DEFAULT_BASE_AMPLITUDE) / 0.25, 0.0, 1.0)
 		_squeak_audio_player.volume_db = lerpf(squeak_base_volume_db, squeak_max_volume_db, impulse_factor)
 
 ## Функция для передачи импульса лампе (например, когда игрок задел лампу или при вспышке)
@@ -193,16 +222,150 @@ func push(impulse_x: float, impulse_z: float) -> void:
 	if _squeak_audio_player and not _squeak_audio_player.playing:
 		_squeak_audio_player.play()
 
-## Увеличение амплитуды качания лампы с плавным затуханием до базового 0.035
-func trigger_amplitude_burst(target_amplitude: float, decay_duration: float = 6.5) -> void:
+## Увеличение амплитуды качания лампы с эффектом реалистичного толчка и плавным затуханием
+func trigger_amplitude_burst(target_amplitude: float, decay_duration: float = 6.5, push_duration: float = 0.60) -> void:
 	if _amplitude_tween and _amplitude_tween.is_valid():
 		_amplitude_tween.kill()
-	base_amplitude = target_amplitude
+	target_burst_amplitude = target_amplitude
 	is_swinging = true
 	if _squeak_audio_player and not _squeak_audio_player.playing:
 		_squeak_audio_player.play()
-	_amplitude_tween = create_tween().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	_amplitude_tween.tween_property(self, "base_amplitude", DEFAULT_BASE_AMPLITUDE, decay_duration)
+		
+	var target_idle: float = DEFAULT_BASE_AMPLITUDE if current_stage >= 2 else 0.0
+
+	_amplitude_tween = create_tween()
+	# 1. Плавный толчок: нарастание амплитуды без визуального телепортирования
+	_amplitude_tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	_amplitude_tween.tween_property(self, "base_amplitude", target_amplitude, push_duration)
+	# 2. Плавное затухание обратно к целевой базовой амплитуде
+	_amplitude_tween.chain().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_amplitude_tween.tween_property(self, "base_amplitude", target_idle, decay_duration)
+	_amplitude_tween.finished.connect(func():
+		if current_stage < 2:
+			is_swinging = false
+			base_amplitude = 0.0
+			rotation = Vector3.ZERO
+			if _squeak_audio_player and _squeak_audio_player.playing:
+				_squeak_audio_player.stop()
+	)
+
+## Запуск фонового качания и скрипа (со 2 стадии тревоги)
+func start_ambient_swinging() -> void:
+	is_swinging = true
+	if _squeak_audio_player and not _squeak_audio_player.playing:
+		_squeak_audio_player.play()
+	if _amplitude_tween == null or not _amplitude_tween.is_valid():
+		_amplitude_tween = create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		_amplitude_tween.tween_property(self, "base_amplitude", DEFAULT_BASE_AMPLITUDE, 2.0)
+
+## Остановка фонового качания и скрипа
+func stop_ambient_swinging() -> void:
+	if _amplitude_tween and _amplitude_tween.is_valid():
+		_amplitude_tween.kill()
+	is_swinging = false
+	base_amplitude = 0.0
+	rotation = Vector3.ZERO
+	if _squeak_audio_player and _squeak_audio_player.playing:
+		_squeak_audio_player.stop()
+
+func _on_escalation_stage_changed(stage: int, _total_losses: int) -> void:
+	current_stage = stage
+	match stage:
+		1:
+			_stop_stage3_flickers()
+			_stop_stage4_red_pulse()
+			_restore_default_lighting()
+			is_swinging = false
+			base_amplitude = 0.0
+			rotation = Vector3.ZERO
+			if _squeak_audio_player and _squeak_audio_player.playing:
+				_squeak_audio_player.stop()
+		2:
+			_stop_stage3_flickers()
+			_stop_stage4_red_pulse()
+			_restore_default_lighting()
+			start_ambient_swinging()
+		3:
+			_stop_stage4_red_pulse()
+			_restore_default_lighting()
+			start_ambient_swinging()
+			_start_stage3_flickers()
+		4:
+			_stop_stage3_flickers()
+			start_ambient_swinging()
+			_start_stage4_red_pulse()
+
+func _on_game_reset(_playthrough: int = 1) -> void:
+	current_stage = 1
+	_stop_stage3_flickers()
+	_stop_stage4_red_pulse()
+	_restore_default_lighting()
+	stop_ambient_swinging()
+
+## Запуск периодического пропадания света на 3 стадии (раз в 15-45 сек)
+func _start_stage3_flickers() -> void:
+	_stop_stage3_flickers()
+	_schedule_stage3_flicker()
+
+func _schedule_stage3_flicker() -> void:
+	if current_stage != 3 or not is_inside_tree():
+		return
+	var delay: float = randf_range(stage3_min_interval, stage3_max_interval)
+	_stage3_timer = get_tree().create_timer(delay)
+	_stage3_timer.timeout.connect(_on_stage3_flicker_timeout)
+
+func _on_stage3_flicker_timeout() -> void:
+	if current_stage != 3:
+		return
+	# Если сейчас не играет другой перебой со светом, запускаем пропадание света как при поедании фигур
+	if not _is_trouble_playing:
+		trigger_amplitude_burst(0.20, 5.0)
+		play_trouble_animation(-1, [0, 1, 2, 3])
+	_schedule_stage3_flicker()
+
+func _stop_stage3_flickers() -> void:
+	_stage3_timer = null
+
+## Запуск красного пульсирующего света на 4 стадии
+func _start_stage4_red_pulse() -> void:
+	_stop_stage4_red_pulse()
+	_stop_stage3_flickers()
+	_kill_active_tweens()
+	if _anim_player and _anim_player.is_playing():
+		_anim_player.stop()
+	_is_trouble_playing = false
+	
+	# Красный свет от лампочки и тревожное свечение колбы
+	if _omni_light:
+		_omni_light.light_color = Color(1.0, 0.08, 0.04, 1.0)
+	if _glow_material:
+		_glow_material.emission = Color(1.0, 0.08, 0.04)
+		_glow_material.albedo_color = Color(0.95, 0.15, 0.12)
+		
+	# Бесконечная анимация пульсации: сбавляет мощность -> возвращает мощность -> сбавляет -> возвращает
+	_stage4_pulse_tween = create_tween().set_loops()
+	_stage4_pulse_tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_stage4_pulse_tween.tween_property(self, "light_intensity_ratio", 0.18, 0.9)
+	_stage4_pulse_tween.tween_property(self, "light_intensity_ratio", 1.15, 0.9)
+
+func _stop_stage4_red_pulse() -> void:
+	if _stage4_pulse_tween and _stage4_pulse_tween.is_valid():
+		_stage4_pulse_tween.kill()
+		_stage4_pulse_tween = null
+
+func _restore_default_lighting() -> void:
+	if _omni_light:
+		_omni_light.light_color = _default_light_color
+	if _glow_material:
+		_glow_material.emission = _default_glow_emission_color
+		_glow_material.albedo_color = _default_glow_albedo_color
+	light_intensity_ratio = 1.0
+	_apply_light_intensity(1.0)
+
+## Реакция лампы на наружные подземные толчки и взрывы (потери врага)
+func _on_seismic_shock_triggered(intensity: float, _is_subterranean: bool) -> void:
+	var lamp_impulse: float = clampf(intensity * 0.40, 0.12, 0.45)
+	trigger_amplitude_burst(lamp_impulse, 4.5 + intensity * 2.0)
 
 ## Применение текущего коэффициента к источнику света и материалу колбы
 func _apply_light_intensity(ratio: float) -> void:
@@ -218,21 +381,28 @@ func _on_piece_captured(piece_type: String, is_white: bool) -> void:
 	if not is_white:
 		return
 		
+	if current_stage >= 4:
+		# На 4 стадии лампа пульсирует аварийным красным светом, даем толчок маятнику без срыва пульсации
+		trigger_amplitude_burst(0.40, 6.0)
+		return
+		
 	var type: String = piece_type.to_lower()
 	match type:
 		"pawn":
-			# Пешка: 2 самых быстрых звука перебоя (0 и 2). Лампу НЕ раскачиваем!
+			# Пешка: перебой света + раскачивание и скрип
+			trigger_amplitude_burst(0.18, 5.0)
 			play_trouble_animation(-1, [0, 2])
 		"knight", "bishop":
-			# Конь и Слон: увеличиваем амплитуду до 0.3 с плавным затуханием до 0.035
-			trigger_amplitude_burst(0.3, 6.0)
+			# Конь и Слон: увеличиваем амплитуду до 0.30 с плавным затуханием
+			trigger_amplitude_burst(0.30, 6.0)
 			play_trouble_animation(-1, [0, 1, 2, 3])
 		"rook":
-			# Ладья: мощный блэкаут на 0.85с со вспышкой перекала (все звуки). Лампу НЕ раскачиваем!
+			# Ладья: мощный блэкаут на 0.85с + сильное раскачивание и скрип
+			trigger_amplitude_burst(0.40, 7.0)
 			play_rook_outage()
 		"queen":
-			# Ферзь: увеличиваем амплитуду до 0.5 с плавным затуханием до 0.035 + катастрофический блэкаут 2.5с!
-			trigger_amplitude_burst(0.5, 9.0)
+			# Ферзь: увеличиваем амплитуду до 0.55 + катастрофический блэкаут 2.5с
+			trigger_amplitude_burst(0.55, 9.0)
 			play_queen_catastrophic_outage(2.5)
 
 ## Легкое дрожание света при потере коня/слона
@@ -481,8 +651,9 @@ func _play_procedural_flicker(sound_idx: int) -> void:
 
 func _on_trouble_finished() -> void:
 	_is_trouble_playing = false
-	light_intensity_ratio = 1.0
-	_apply_light_intensity(1.0)
+	if current_stage < 4:
+		light_intensity_ratio = 1.0
+		_apply_light_intensity(1.0)
 	if _ambient_audio:
 		_ambient_audio.volume_db = _base_ambient_db
 	var bus = _get_event_bus()
