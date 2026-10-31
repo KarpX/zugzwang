@@ -13,10 +13,12 @@
 [ext_resource type="Script" uid="uid://d0s352782ryie" path="res://scripts/world/security_camera.gd" id="6_seccam"]
 [ext_resource type="Material" uid="uid://cordsocket01" path="res://assets/obj/bulb_cord_socket.tres" id="7_cordsocket"]
 [ext_resource type="Material" uid="uid://bulbglow001" path="res://assets/obj/bulb_glow.tres" id="8_bulbglow"]
+[ext_resource type="AudioStream" uid="uid://dddw5gn3dxahi" path="res://assets/sounds/camera_turning.ogg" id="8_jxwrd"]
 [ext_resource type="Script" uid="uid://ga1xv3l03hki" path="res://scripts/hanging_lamp.gd" id="9_lamp_script"]
 [ext_resource type="Material" uid="uid://tablemat001" path="res://assets/obj/table_material.tres" id="10_tablemat"]
 [ext_resource type="Material" uid="uid://cambasemat01" path="res://assets/obj/camera_base_material.tres" id="11_cambasemat"]
 [ext_resource type="Material" uid="uid://cammaterial01" path="res://assets/obj/camera_material.tres" id="12_cammat"]
+[ext_resource type="AudioStream" uid="uid://d35f8fhkj4urh" path="res://assets/sounds/bulb_ambient.ogg" id="15_katsu"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_x5vg1"]
 size = Vector3(40.07849, 13.515747, 0.60009766)
@@ -109,8 +111,11 @@ material_override = ExtResource("11_cambasemat")
 mesh = ExtResource("3_7dqbv")
 
 [node name="CameraPivot" type="Node3D" parent="walls/CameraBase" unique_id=1142422552]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0.5)
+transform = Transform3D(-0.2576304, 0, -0.96624357, 0, 1, 0, 0.96624357, 0, -0.2576304, 0, 2, 0.5)
 script = ExtResource("6_seccam")
+tracking_speed = 3.0
+min_pitch_deg = 20.0
+turn_threshold_deg = 0.15
 
 [node name="CameraMesh" type="MeshInstance3D" parent="walls/CameraBase/CameraPivot" unique_id=1142422556]
 transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 0.2, -0.4, -1.2)
@@ -123,13 +128,12 @@ light_color = Color(1, 0.1, 0.1, 1)
 light_energy = 1.6
 light_volumetric_fog_energy = 3.0
 shadow_enabled = true
-distance_fade_enabled = true
 spot_range = 28.0
 spot_angle = 14.0
 spot_angle_attenuation = 1.8
 
 [node name="LensGlow" type="OmniLight3D" parent="walls/CameraBase/CameraPivot" unique_id=1142422554]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -2.35)
+transform = Transform3D(0.99999994, 0, 0, 0, 1, 0, 0, 0, 0.99999994, -0.007958412, 0, -2.3798468)
 light_color = Color(1, 0.05, 0.05, 1)
 light_energy = 0.8
 omni_range = 0.6
@@ -137,7 +141,17 @@ omni_attenuation = 2.5
 
 [node name="LensMesh" type="MeshInstance3D" parent="walls/CameraBase/CameraPivot" unique_id=1142422555]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -2.2467504)
+visible = false
 mesh = SubResource("SphereMesh_lens")
+
+[node name="CameraSound" type="AudioStreamPlayer3D" parent="walls/CameraBase/CameraPivot" unique_id=1643142000]
+transform = Transform3D(0.99999994, 0, 0, 0, 1, 0, 0, 0, 0.99999994, 0.04675913, 0, -0.09361696)
+stream = ExtResource("8_jxwrd")
+volume_db = -15.0
+unit_size = 12.0
+max_db = 2.0
+max_distance = 60.0
+bus = &"Ambient"
 
 [node name="floor2" type="MeshInstance3D" parent="." unique_id=96282830]
 transform = Transform3D(5, 0, 0, 0, 1, 0, 0, 0, 6.5, 16, 12.502992, 20)
@@ -156,6 +170,7 @@ mesh = ExtResource("2_85yof")
 [node name="player" type="CharacterBody3D" parent="." unique_id=570902455 groups=["player"]]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 16, 5.185, 3.5)
 script = ExtResource("3_85yof")
+table_interact_distance = 5.0
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="player" unique_id=1069967162]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1.2216187, 0)
@@ -191,12 +206,25 @@ is_swinging = true
 [node name="OmniLight3D" type="OmniLight3D" parent="HangingBulb" unique_id=1332429521]
 transform = Transform3D(4, 0, 0, 0, 4, 0, 0, 0, 4, 0, -14.1, 0)
 light_color = Color(1, 0.9411765, 0.6627451, 1)
+<<<<<<< HEAD
 light_energy = 0.62
+=======
+>>>>>>> 8dc6481f5925d25788a0db7968e67036adf00a26
 light_bake_mode = 1
 shadow_enabled = true
 shadow_bias = 0.05
 omni_range = 12.728249
 omni_attenuation = 1.2
+
+[node name="AudioStreamPlayer3D" type="AudioStreamPlayer3D" parent="HangingBulb" unique_id=1420703584]
+transform = Transform3D(4, 0, 0, 0, 4, 0, 0, 0, 4, 0, -12.28907, 0)
+stream = ExtResource("15_katsu")
+volume_db = -8.0
+unit_size = 3.0
+max_db = 1.0
+autoplay = true
+max_distance = 25.0
+bus = &"Ambient"
 
 [node name="TableStatic" type="StaticBody3D" parent="." unique_id=1486369480]
 
@@ -206,8 +234,13 @@ material_override = ExtResource("10_tablemat")
 mesh = ExtResource("4_14vil")
 
 [node name="ChessBoard" parent="TableStatic/Table" unique_id=21915507 groups=["chess_board"] instance=ExtResource("5_board")]
+<<<<<<< HEAD
 transform = Transform3D(-0.7, 0, -6.119594e-08, 0, 0.7, 0, 6.119594e-08, 0, -0.7, -1.8477612, 5.6046634, -1.7485161)
 black_move_duration = 2.5
+=======
+transform = Transform3D(-0.7, 0, -6.119594e-08, 0, 0.7, 0, 6.119594e-08, 0, -0.7, -1.8481598, 5.6, -1.751934)
+black_move_duration = 1.2
+>>>>>>> 8dc6481f5925d25788a0db7968e67036adf00a26
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="TableStatic" unique_id=1298941691]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.009525, 2.201233, 20.009485)
