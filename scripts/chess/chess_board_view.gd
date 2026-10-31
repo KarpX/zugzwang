@@ -20,11 +20,11 @@ const STEP_Z: float = -0.5844
 
 @export_group("Скорость перемещения фигур")
 ## Длительность хода игрока (белые фигуры), секунды
-@export_range(0.1, 2.0, 0.05) var white_move_duration: float = 0.4
+@export_range(0.05, 2.0, 0.05) var white_move_duration: float = 0.35
 ## Длительность хода войны (черные фигуры, медленное зловещее скольжение со скрежетом)
-@export_range(0.5, 4.0, 0.1) var black_move_duration: float = 1.6
-## Задержка перед ходом ИИ черных, секунды
-@export_range(0.1, 3.0, 0.1) var ai_turn_delay: float = 0.8
+@export_range(0.05, 4.0, 0.1) var black_move_duration: float = 0.8
+## Задержка перед ходом ИИ черных после окончания анимации хода игрока, секунды
+@export_range(0.0, 2.0, 0.05) var ai_turn_delay: float = 0.2
 
 # Узел камеры для вида над доской
 @onready var camera_point: Marker3D = $CameraPoint
@@ -51,6 +51,13 @@ var current_legal_moves: Array[Vector2i] = []
 var is_active: bool = false # Активен ли режим управления шахматами
 var is_ai_thinking: bool = false
 
+# Фоновый параллельный расчет хода ИИ (просчет во время анимации белых)
+var _ai_thread: Thread = null
+var _precomputed_ai_move: Dictionary = {}
+var _is_ai_calculating: bool = false
+var _white_animation_finished: bool = false
+var _ai_turn_delay_finished: bool = false
+
 # Состояние превращения пешки
 var _promoting_pos: Vector2i = Vector2i(-1, -1)
 var _promoting_node: ChessPiece3D = null
@@ -70,6 +77,13 @@ var meshes: Dictionary = {}
 var _board_light_tween: Tween = null
 var _is_light_trouble_active: bool = false
 
+# Отладочный HUD и режим быстрой анимации
+var is_fast_mode: bool = false
+var _debug_hud_canvas: CanvasLayer = null
+var _debug_hud_panel: PanelContainer = null
+var _debug_hud_label: RichTextLabel = null
+var _is_debug_hud_visible: bool = true
+
 func _get_event_bus() -> Node:
 	if not is_inside_tree():
 		return null
@@ -88,7 +102,9 @@ func _ready() -> void:
 			add_child(blood_container)
 	
 	logic = ChessLogicScript.new()
+	ChessBot._init_zobrist()
 	spawn_pieces()
+	_setup_debug_hud()
 	
 	# Подписываемся на события шины
 	var bus = _get_event_bus()
@@ -203,6 +219,38 @@ func _on_lamp_trouble_finished() -> void:
 	if is_ai_thinking and not logic.is_game_over and not logic.is_white_turn:
 		var resume_timer = get_tree().create_timer(0.35)
 		resume_timer.timeout.connect(_execute_ai_turn)
+
+func _exit_tree() -> void:
+	_cleanup_ai_thread()
+
+func _process(_delta: float) -> void:
+	# Проверка готовности фонового потока расчета хода черных
+	if _is_ai_calculating and _ai_thread != null:
+		if not _ai_thread.is_alive():
+			var move = _ai_thread.wait_to_finish()
+			_precomputed_ai_move = move if move is Dictionary else {}
+			_is_ai_calculating = false
+			_ai_thread = null
+			_check_execute_ai_turn()
+
+	if _is_debug_hud_visible and _debug_hud_label != null:
+		_update_debug_hud()
+
+func _input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo:
+		var code: Key = event.keycode if event.keycode != KEY_NONE else event.physical_keycode
+		match code:
+			KEY_F1:
+				restart_game(1)
+				_update_debug_hud()
+			KEY_F2:
+				restart_game(2)
+				_update_debug_hud()
+			KEY_F3:
+				toggle_fast_mode()
+				_update_debug_hud()
+			KEY_F4:
+				toggle_debug_hud()
 
 func _init_materials() -> void:
 	# Белые: турнирный самшит с красным фетровым основанием
@@ -320,9 +368,14 @@ func spawn_pieces() -> void:
 				_spawn_piece_at(pos, piece_data["type"], piece_data["is_white"])
 
 func _spawn_piece_at(pos: Vector2i, p_type: String, is_white: bool) -> ChessPiece3D:
+	if meshes.is_empty():
+		_init_meshes()
+	if white_mat == null or black_mat == null:
+		_init_materials()
+		
 	var piece_node = ChessPiece3DScript.new()
 	var key: String = p_type + ("_white" if is_white else "_black")
-	var mesh: Mesh = meshes.get(key, meshes.get(p_type, meshes["pawn"]))
+	var mesh: Mesh = meshes.get(key, meshes.get(p_type, null))
 	var mat: Material = white_mat if is_white else black_mat
 	piece_node.setup(p_type, is_white, pos, mesh, mat, surface_y)
 	
@@ -330,6 +383,189 @@ func _spawn_piece_at(pos: Vector2i, p_type: String, is_white: bool) -> ChessPiec
 	pieces_container.add_child(piece_node)
 	piece_nodes[pos] = piece_node
 	return piece_node
+
+var _is_restarting: bool = false
+
+## Автоматический запуск перезапуска доски после мата с атмосферной задержкой
+func _trigger_checkmate_restart(delay: float = 2.5) -> void:
+	if _is_restarting:
+		return
+	_is_restarting = true
+	var timer = get_tree().create_timer(delay)
+	timer.timeout.connect(func():
+		_is_restarting = false
+		var next_p: int = logic.playthrough + 1
+		restart_game(next_p)
+	)
+
+## Перезапуск шахматной партии с расстановкой всех 32 фигур обратно на свои места
+func restart_game(next_playthrough: int = -1) -> void:
+	_cleanup_ai_thread()
+	clear_selection()
+	_clear_highlights()
+	clear_blood_stains()
+	
+	if _promotion_dialog != null and is_instance_valid(_promotion_dialog):
+		_promotion_dialog.queue_free()
+		_promotion_dialog = null
+	if _promoting_node != null and is_instance_valid(_promoting_node):
+		_promoting_node.set_selected(false)
+		_promoting_node = null
+		
+	is_ai_thinking = false
+	
+	if pieces_container == null:
+		pieces_container = get_node_or_null("Pieces")
+		
+	if pieces_container != null:
+		for child in pieces_container.get_children():
+			pieces_container.remove_child(child)
+			child.queue_free()
+			
+	piece_nodes.clear()
+	
+	if logic == null:
+		logic = ChessLogicScript.new()
+		
+	if next_playthrough <= 0:
+		next_playthrough = logic.playthrough + 1
+	logic.reset_board(next_playthrough)
+	
+	# Спавним все 32 фигуры на свои исходные места
+	for x in range(8):
+		for y in range(8):
+			var pos: Vector2i = Vector2i(x, y)
+			var piece_data = logic.get_piece(pos)
+			if piece_data != null:
+				_spawn_piece_at(pos, piece_data["type"], piece_data["is_white"])
+				
+	var bus = _get_event_bus()
+	if bus:
+		if bus.has_method("reset_game_state"):
+			bus.reset_game_state(logic.playthrough)
+		elif bus.has_signal("game_reset"):
+			bus.game_reset.emit(logic.playthrough)
+			
+	# Звуковой сигнал перехода хода игроку
+	if is_inside_tree():
+		_play_player_move_sound(to_global(cell_to_local_pos(Vector2i(4, 0))))
+		
+	_update_debug_hud()
+
+# ==============================================================================
+# ОТЛАДОЧНЫЙ РЕЖИМ И ПАНЕЛЬ ПЕРЕМЕННЫХ (Debug HUD & Testing Controls)
+# ==============================================================================
+
+func toggle_fast_mode() -> void:
+	is_fast_mode = not is_fast_mode
+	if is_fast_mode:
+		white_move_duration = 0.05
+		black_move_duration = 0.05
+		ai_turn_delay = 0.02
+	else:
+		white_move_duration = 0.35
+		black_move_duration = 0.8
+		ai_turn_delay = 0.2
+
+func toggle_debug_hud() -> void:
+	_is_debug_hud_visible = not _is_debug_hud_visible
+	if _debug_hud_canvas != null and is_instance_valid(_debug_hud_canvas):
+		_debug_hud_canvas.visible = _is_debug_hud_visible
+
+func _setup_debug_hud() -> void:
+	if not is_inside_tree():
+		return
+	if _debug_hud_canvas != null and is_instance_valid(_debug_hud_canvas):
+		return
+		
+	var canvas = CanvasLayer.new()
+	canvas.name = "DebugHUDCanvas"
+	canvas.layer = 12
+	add_child(canvas)
+	_debug_hud_canvas = canvas
+	
+	var panel = PanelContainer.new()
+	panel.name = "DebugPanel"
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	panel.offset_left = 16.0
+	panel.offset_top = 16.0
+	
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0.06, 0.08, 0.12, 0.88)
+	style.border_color = Color(0.2, 0.7, 0.9, 0.5)
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(6)
+	style.content_margin_left = 14.0
+	style.content_margin_top = 10.0
+	style.content_margin_right = 14.0
+	style.content_margin_bottom = 10.0
+	panel.add_theme_stylebox_override("panel", style)
+	canvas.add_child(panel)
+	_debug_hud_panel = panel
+	
+	var label = RichTextLabel.new()
+	label.name = "DebugLabel"
+	label.bbcode_enabled = true
+	label.fit_content = true
+	label.scroll_active = false
+	label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	label.custom_minimum_size = Vector2(340, 190)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_child(label)
+	_debug_hud_label = label
+	
+	_update_debug_hud()
+
+func _update_debug_hud() -> void:
+	if not _is_debug_hud_visible or _debug_hud_label == null:
+		return
+		
+	var pt = logic.playthrough if logic else 1
+	var pt_color = "#ff5555" if pt == 1 else "#55ff88"
+	var pt_name = "МАТЧ 1: ХИЩНЫЙ ИИ (Hard)" if pt == 1 else "МАТЧ 2: ПОДДАВКИ (Medium)"
+	
+	var speed_text = "[color=#ffd700]⚡ 0.05с (БЫСТРО)[/color]" if is_fast_mode else "[color=#aaaaaa]0.8с (Норма)[/color]"
+	var turn_text = "[color=#ffffff]Белые (Игрок)[/color]" if (logic and logic.is_white_turn) else "[color=#ff8888]Черные (ИИ)[/color]"
+	var ai_status = "[color=#88ff88]Ожидание[/color]"
+	if _is_ai_calculating:
+		ai_status = "[color=#ffaa00]⚡ Просчет (в полете)...[/color]"
+	elif is_ai_thinking:
+		ai_status = "[color=#ff5555]Ходит...[/color]"
+	
+	var w_mat = 0
+	var b_mat = 0
+	if logic:
+		for x in range(8):
+			for y in range(8):
+				var p = logic.get_piece(Vector2i(x, y))
+				if p != null and p["type"] != "king":
+					var val = ChessLogic.PIECE_VALUES.get(p["type"], 0)
+					if p["is_white"]: w_mat += val
+					else: b_mat += val
+	var diff = w_mat - b_mat
+	var diff_str = ("+" if diff > 0 else "") + str(diff)
+	var diff_color = "#88ffaa" if diff > 0 else ("#ff8888" if diff < 0 else "#cccccc")
+	
+	var bus = _get_event_bus()
+	var losses = bus.total_losses if bus else 0
+	var stage = bus.current_stage if bus else 1
+	
+	var bot_info = ChessBot.last_search_info
+	var eval_score = bot_info.get("score", 0.0)
+	var search_depth = bot_info.get("depth", 0)
+	
+	var text = "[b][color=#33ccff]⚙ ОТЛАДКА ШАХМАТ (ZUGZWANG)[/color][/b]\n"
+	text += "Режим: [color=%s][b]%s[/b][/color]\n" % [pt_color, pt_name]
+	text += "Скорость ходов: %s\n" % speed_text
+	text += "Ход #%d: %s | ИИ: %s\n" % [logic.move_count if logic else 0, turn_text, ai_status]
+	text += "Материал: Белые %d | Черные %d ([color=%s]%s[/color])\n" % [w_mat, b_mat, diff_color, diff_str]
+	text += "Оценка ИИ: [color=#88ffaa]%.1f cp[/color] (глубина %d)\n" % [eval_score, search_depth]
+	text += "Бункер: Потери %d/16 | Стадия тревоги %d/4\n" % [losses, stage]
+	text += "[color=#445566]──────────────────────────────────[/color]\n"
+	text += "[color=#bbccdd][b][F1][/b] Матч 1 | [b][F2][/b] Матч 2 | [b][F3][/b] Скорость | [b][F4][/b] Скрыть[/color]"
+	
+	_debug_hud_label.text = text
 
 func _on_camera_mode_changed(is_board_mode: bool) -> void:
 	is_active = is_board_mode
@@ -340,7 +576,8 @@ func _on_camera_mode_changed(is_board_mode: bool) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if _promotion_dialog != null and is_instance_valid(_promotion_dialog):
 		if event is InputEventKey and event.pressed and not event.echo:
-			match event.keycode:
+			var code: Key = event.keycode if event.keycode != KEY_NONE else event.physical_keycode
+			match code:
 				KEY_1, KEY_Q:
 					_on_promotion_selected(_promoting_pos, _promoting_node, "queen")
 					get_viewport().set_input_as_handled()
@@ -511,7 +748,64 @@ func _clear_highlights() -> void:
 		return
 	for child in highlights_container.get_children():
 		child.queue_free()
+
+func clear_highlights() -> void:
+	_clear_highlights()
 		
+
+## Остановка и очистка фонового потока расчета ИИ
+func _cleanup_ai_thread() -> void:
+	if _ai_thread != null and _ai_thread.is_started():
+		_ai_thread.wait_to_finish()
+	_ai_thread = null
+	_is_ai_calculating = false
+	_white_animation_finished = false
+	_ai_turn_delay_finished = false
+	_precomputed_ai_move.clear()
+
+## Запуск фонового просчета хода черных (выполняется ПАРАЛЛЕЛЬНО с анимацией полета фигуры игрока)
+func _start_precomputing_ai_move() -> void:
+	_cleanup_ai_thread()
+	
+	if logic == null or logic.is_game_over:
+		return
+		
+	is_ai_thinking = true
+	_is_ai_calculating = true
+	_precomputed_ai_move.clear()
+	
+	var grid_copy: Array = logic.clone_grid()
+	var pt: int = logic.playthrough
+	
+	_ai_thread = Thread.new()
+	var thread_func = func():
+		return ChessBot.choose_best_move(grid_copy, pt)
+		
+	var err = _ai_thread.start(thread_func)
+	if err != OK:
+		# Резервный расчет на случай сбоя создания потока
+		_is_ai_calculating = false
+		_ai_thread = null
+		_precomputed_ai_move = ChessBot.choose_best_move(grid_copy, pt)
+
+## Проверка условий для фактического перемещения черной фигуры по доске
+func _check_execute_ai_turn() -> void:
+	# ИИ начинает ход только когда:
+	# 1. Анимация переноса белой фигуры полностью завершилась
+	# 2. Задержка между ходами истекла
+	# 3. Фоновый расчет хода ИИ завершен
+	if not _white_animation_finished or not _ai_turn_delay_finished or _is_ai_calculating:
+		return
+	if logic == null or logic.is_game_over or not is_inside_tree():
+		is_ai_thinking = false
+		return
+		
+	var move_to_play: Dictionary = _precomputed_ai_move
+	_precomputed_ai_move = {}
+	_white_animation_finished = false
+	_ai_turn_delay_finished = false
+	
+	_execute_ai_turn(move_to_play)
 
 ## Выполнение хода игрока
 func _execute_player_move(from_pos: Vector2i, to_pos: Vector2i) -> void:
@@ -555,6 +849,12 @@ func _execute_player_move(from_pos: Vector2i, to_pos: Vector2i) -> void:
 	piece_node.board_pos = to_pos
 	var target_world_pos: Vector3 = to_global(cell_to_local_pos(to_pos))
 	
+	# СБРАСЫВАЕМ ФЛАГИ ГОТОВНОСТИ И ЗАПУСКАЕМ РАСЧЕТ ИИ НЕ ДОЖИДАЯСЬ ОКОНЧАНИЯ АНИМАЦИИ
+	_white_animation_finished = false
+	_ai_turn_delay_finished = false
+	if not is_pawn_promotion and not move_res["is_checkmate"]:
+		_start_precomputing_ai_move()
+	
 	var on_move_finished = func():
 		if is_capture:
 			_play_capture_sound(target_world_pos)
@@ -579,12 +879,23 @@ func _execute_player_move(from_pos: Vector2i, to_pos: Vector2i) -> void:
 			if move_res["is_checkmate"]:
 				if bus:
 					bus.game_over.emit(logic.winner)
+				_trigger_checkmate_restart()
 				return
 				
-			# Ход ИИ (Черные) с атмосферной задержкой после завершения хода белых
-			is_ai_thinking = true
-			var timer = get_tree().create_timer(ai_turn_delay)
-			timer.timeout.connect(_execute_ai_turn)
+			# Анимация перемещения белой фигуры завершилась
+			_white_animation_finished = true
+			
+			# Задержка перед ходом черных
+			var delay: float = 0.02 if is_fast_mode else ai_turn_delay
+			if delay <= 0.01:
+				_ai_turn_delay_finished = true
+				_check_execute_ai_turn()
+			else:
+				var timer = get_tree().create_timer(delay)
+				timer.timeout.connect(func():
+					_ai_turn_delay_finished = true
+					_check_execute_ai_turn()
+				)
 	
 	if white_move_duration <= 0.05:
 		on_move_finished.call()
@@ -596,9 +907,9 @@ func _execute_player_move(from_pos: Vector2i, to_pos: Vector2i) -> void:
 		bus.piece_moved.emit(from_pos, to_pos)
 		bus.player_made_action.emit()
 
-## Ход ИИ войны
-func _execute_ai_turn() -> void:
-	if logic.is_game_over or not is_inside_tree():
+## Ход ИИ войны (использует предрассчитанный ход ai_move)
+func _execute_ai_turn(ai_move: Dictionary = {}) -> void:
+	if logic == null or logic.is_game_over or not is_inside_tree():
 		is_ai_thinking = false
 		return
 
@@ -611,7 +922,9 @@ func _execute_ai_turn() -> void:
 		is_ai_thinking = true
 		return
 		
-	var ai_move = logic.get_best_ai_move()
+	if ai_move.is_empty():
+		ai_move = logic.get_best_ai_move()
+		
 	if ai_move.is_empty():
 		is_ai_thinking = false
 		return
@@ -688,6 +1001,7 @@ func _execute_ai_turn() -> void:
 		if move_res["is_checkmate"]:
 			if bus:
 				bus.game_over.emit(logic.winner)
+			_trigger_checkmate_restart()
 	)
 
 # ==============================================================================
@@ -743,10 +1057,10 @@ func _show_promotion_dialog(cell: Vector2i, piece_node: ChessPiece3D) -> void:
 	vbox.add_child(hbox)
 	
 	var options: Array[Dictionary] = [
-		{ "type": "queen", "name": "Ферзь" },
-		{ "type": "rook", "name": "Ладья" },
-		{ "type": "bishop", "name": "Слон" },
-		{ "type": "knight", "name": "Конь" }
+		{"type": "queen", "name": "Ферзь"},
+		{"type": "rook", "name": "Ладья"},
+		{"type": "bishop", "name": "Слон"},
+		{"type": "knight", "name": "Конь"}
 	]
 	
 	for opt in options:
@@ -897,12 +1211,23 @@ func _on_promotion_selected(cell: Vector2i, piece_node: ChessPiece3D, chosen_typ
 	if logic.is_game_over:
 		if bus:
 			bus.game_over.emit(logic.winner)
+		_trigger_checkmate_restart()
 		return
 		
-	# 3. Передаем ход черному ИИ
-	is_ai_thinking = true
-	var timer = get_tree().create_timer(ai_turn_delay)
-	timer.timeout.connect(_execute_ai_turn)
+	# 3. Передаем ход черному ИИ с параллельным фоновым просчетом
+	_white_animation_finished = true
+	_ai_turn_delay_finished = false
+	_start_precomputing_ai_move()
+	var delay: float = 0.02 if is_fast_mode else ai_turn_delay
+	if delay <= 0.01:
+		_ai_turn_delay_finished = true
+		_check_execute_ai_turn()
+	else:
+		var timer = get_tree().create_timer(delay)
+		timer.timeout.connect(func():
+			_ai_turn_delay_finished = true
+			_check_execute_ai_turn()
+		)
 
 # ==============================================================================
 # ВОКСЕЛЬНЫЕ ПЯТНА КРОВИ (Voxel Blood Stains)
@@ -995,6 +1320,9 @@ func _play_player_move_sound(world_pos: Vector3) -> void:
 		player_turn_sound.global_position = world_pos
 		player_turn_sound.pitch_scale = randf_range(0.96, 1.04)
 		player_turn_sound.play()
+
+func _play_player_turn_sound(world_pos: Vector3) -> void:
+	_play_player_move_sound(world_pos)
 
 ## Воспроизведение звука взятия фигуры (сочный тяжелый удар дерева о дерево)
 func _play_capture_sound(world_pos: Vector3) -> void:

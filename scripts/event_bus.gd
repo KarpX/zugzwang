@@ -20,6 +20,9 @@ signal piece_captured(piece_type: String, is_white: bool)
 ## Окончание игры: "white" (мат черным), "black" (мат белым), "breach" (выбили дверь)
 signal game_over(winner: String)
 
+## Вызывается при перезапуске партии и сбросе расстановки фигур
+signal game_reset(playthrough: int)
+
 ## Вызывается при любом осознанном действии игрока (сброс таймера стука в дверь)
 signal player_made_action()
 
@@ -128,13 +131,13 @@ func _on_game_over(_winner: String) -> void:
 		escalation_stage_changed.emit(current_stage, total_losses)
 
 ## Сброс состояния для перезапуска партии
-func reset_game_state() -> void:
+func reset_game_state(playthrough: int = 1) -> void:
 	total_losses = 0
 	white_losses = 0
 	black_losses = 0
 	white_score = 40
 	black_score = 40
 	current_stage = 1
-	is_in_board_mode = false
 	is_game_finished = false
+	game_reset.emit(playthrough)
 	is_lamp_trouble_active = false

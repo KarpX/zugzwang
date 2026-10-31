@@ -42,6 +42,8 @@ func _ready() -> void:
 			bus.piece_moved.connect(_on_piece_moved)
 		if bus.has_signal("game_over"):
 			bus.game_over.connect(_on_game_over)
+		if bus.has_signal("game_reset"):
+			bus.game_reset.connect(_on_game_reset)
 
 func _setup_audio_player() -> void:
 	if knock_player == null:
@@ -129,3 +131,8 @@ func reset_idle_timer() -> void:
 func _on_game_over(_winner: String) -> void:
 	is_game_finished = true
 	is_active = false
+
+func _on_game_reset(_playthrough: int) -> void:
+	is_game_finished = false
+	is_active = true
+	reset_idle_timer()

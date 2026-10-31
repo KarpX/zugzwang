@@ -23,6 +23,7 @@
 [ext_resource type="Material" uid="uid://doormat001" path="res://assets/obj/door_material.tres" id="17_doormat"]
 [ext_resource type="ArrayMesh" uid="uid://cjcw86qhrw4vp" path="res://assets/obj/radio.obj" id="17_radio_mesh"]
 [ext_resource type="Material" uid="uid://radiomat001" path="res://assets/obj/radio_material.tres" id="18_radio_mat"]
+[ext_resource type="Material" uid="uid://doormat001" path="res://assets/obj/door_material.tres" id="19_doormat"]
 [ext_resource type="AudioStream" uid="uid://b0rlwhbc4a7ux" path="res://assets/sounds/lamp_troubles_1.ogg" id="19_trouble_sfx"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_x5vg1"]
@@ -229,7 +230,7 @@ shape = SubResource("BoxShape3D_x5vg1")
 
 [node name="Door" type="MeshInstance3D" parent="walls" unique_id=1853457929]
 transform = Transform3D(0.8, 0, 0, 0, 0.8, 0, 0, 0, 0.8, 16, 0, 0)
-material_override = ExtResource("17_doormat")
+material_override = ExtResource("19_doormat")
 mesh = ExtResource("2_qvc4m")
 script = ExtResource("16_door")
 
