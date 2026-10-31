@@ -17,13 +17,30 @@ extends Node3D
 ## Порог угла (в градусах), при котором камера считается поворачивающейся
 @export var turn_threshold_deg: float = 0.2
 
+## Полуугол поля зрения / мертвая зона (в градусах).
+## Пока цель находится внутри этого угла от оптической оси камеры, камера неподвижна.
+## Движение происходит только тогда, когда цель смещает границу поля зрения.
+@export_range(1.0, 45.0, 0.5) var fov_margin_deg: float = 14.0
+
+## Автоматически синхронизировать полуугол поля зрения с дочерним SpotLight3D
+@export var sync_fov_with_spotlight: bool = true
+
+## Задержка выключения звука сервопривода (сек) для сглаживания микро-пауз между кадрами
+@export_range(0.05, 0.5, 0.05) var sound_stop_delay: float = 0.25
+
 @onready var camera_sound: AudioStreamPlayer3D = get_node_or_null("CameraSound")
+
+var _sound_timer: float = 0.0
 
 func _ready() -> void:
 	if camera_sound == null:
 		camera_sound = get_node_or_null("CameraSound")
 	if camera_sound and camera_sound.stream is AudioStreamOggVorbis:
 		(camera_sound.stream as AudioStreamOggVorbis).loop = true
+	if sync_fov_with_spotlight:
+		var spotlight: SpotLight3D = get_node_or_null("NightVisionSpotLight") as SpotLight3D
+		if spotlight:
+			fov_margin_deg = spotlight.spot_angle
 	_resolve_target()
 
 func _notification(what: int) -> void:
@@ -58,13 +75,13 @@ func _process(delta: float) -> void:
 	if not target or not is_instance_valid(target):
 		_resolve_target()
 		if not target:
-			_update_camera_sound(false)
+			_update_camera_sound(false, delta)
 			return
 
 	var target_pos: Vector3 = target.global_position + Vector3(0.0, vertical_offset, 0.0)
 	var dir_to_target: Vector3 = target_pos - global_position
 	if dir_to_target.length_squared() < 0.1:
-		_update_camera_sound(false)
+		_update_camera_sound(false, delta)
 		return
 
 	# Вектор "вверх" с защитой от вертикального вырождения
@@ -73,35 +90,61 @@ func _process(delta: float) -> void:
 	if absf(dir_norm.dot(up_vec)) > 0.99:
 		up_vec = Vector3.FORWARD
 
-	# Целевой трансформ, направляющий локальную ось -Z на игрока
+	# Направление взгляда камеры (локальная ось -Z в мировых координатах)
+	var current_forward: Vector3 = -global_basis.z.normalized()
+	var cos_angle: float = clampf(current_forward.dot(dir_norm), -1.0, 1.0)
+	var angle_to_target: float = acos(cos_angle)
+	var fov_margin_rad: float = deg_to_rad(fov_margin_deg)
+
+	# 1. Если цель находится внутри поля зрения камеры — камера неподвижна
+	if angle_to_target <= fov_margin_rad:
+		_update_camera_sound(false, delta)
+		return
+
+	# 2. Цель пересекает границу поля зрения — вычисляем величину выхода за границу
+	var excess_angle: float = angle_to_target - fov_margin_rad
+	# Минимальный порог для защиты от шума floating-point
+	var min_threshold_rad: float = minf(deg_to_rad(turn_threshold_deg), deg_to_rad(0.05))
+	if excess_angle <= min_threshold_rad:
+		_update_camera_sound(false, delta)
+		return
+
+	# Целевой трансформ, направляющий локальную ось -Z прямо на игрока
 	var target_transform: Transform3D = global_transform.looking_at(target_pos, up_vec)
 	var current_quat: Quaternion = global_basis.get_rotation_quaternion()
 	var target_quat: Quaternion = target_transform.basis.get_rotation_quaternion()
 
-	var angle_to_target: float = current_quat.angle_to(target_quat)
-	var is_turning: bool = false
+	var total_quat_angle: float = current_quat.angle_to(target_quat)
+	if total_quat_angle < 0.0001:
+		_update_camera_sound(false, delta)
+		return
 
-	# Если угол до цели превышает минимальный порог, сервопривод камеры поворачивается
-	if angle_to_target > deg_to_rad(turn_threshold_deg):
-		var slerp_factor: float = clampf(tracking_speed * delta, 0.0, 1.0)
-		var next_quat: Quaternion = current_quat.slerp(target_quat, slerp_factor)
-		global_basis = Basis(next_quat)
-		is_turning = true
-	else:
-		# Достигли цели — фиксируем направление и останавливаем звук
-		global_basis = Basis(target_quat)
-		is_turning = false
+	# Двигаем границу поля зрения со скоростью слежения сервопривода (не более tracking_speed * delta)
+	var max_step: float = tracking_speed * delta
+	var turn_angle: float = minf(excess_angle, max_step)
+	var slerp_fraction: float = clampf(turn_angle / total_quat_angle, 0.0, 1.0)
 
-	_update_camera_sound(is_turning)
+	var next_quat: Quaternion = current_quat.slerp(target_quat, slerp_fraction)
+	global_basis = Basis(next_quat)
 
-## Управление воспроизведением звука сервопривода камеры
-func _update_camera_sound(is_turning: bool) -> void:
+	_update_camera_sound(true, delta)
+
+## Управление воспроизведением звука сервопривода камеры с поддержкой сглаживания микро-пауз
+func _update_camera_sound(is_turning: bool, delta: float = 0.0) -> void:
 	if camera_sound == null or not camera_sound.is_inside_tree():
 		return
 
 	if is_turning:
+		_sound_timer = sound_stop_delay
 		if not camera_sound.playing:
 			camera_sound.play()
 	else:
-		if camera_sound.playing:
-			camera_sound.stop()
+		if delta > 0.0 and _sound_timer > 0.0:
+			_sound_timer -= delta
+			if _sound_timer <= 0.0:
+				if camera_sound.playing:
+					camera_sound.stop()
+		else:
+			_sound_timer = 0.0
+			if camera_sound.playing:
+				camera_sound.stop()

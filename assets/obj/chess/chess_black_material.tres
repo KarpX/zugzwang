@@ -1,10 +1,9 @@
-[gd_resource type="StandardMaterial3D" format=3 uid="uid://chessblackmat01"]
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://dxjv80obus6vc"]
 
-[ext_resource type="Texture2D" uid="uid://dxjv80ob2xbvc" path="res://assets/obj/chess/chess_black.png" id="1_tex"]
+[ext_resource type="Texture2D" uid="uid://bmh3ojg2x03bx" path="res://assets/obj/chess/chess_black.png" id="1_tex"]
 
 [resource]
 resource_name = "chess_black_material"
-cull_mode = 0
 diffuse_mode = 2
 albedo_texture = ExtResource("1_tex")
 metallic_specular = 0.25

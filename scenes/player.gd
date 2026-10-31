@@ -20,6 +20,12 @@ var _cam_tween: Tween = null
 var _hud_prompt: Label = null
 var _chess_board_node: Node3D = null
 
+# Параметры тряски камеры (Screen Shake при взятиях и стуках)
+var _trauma: float = 0.0
+var _shake_decay: float = 2.8        # Скорость затухания
+var _max_shake_offset: float = 0.045 # Максимальное смещение в метрах
+var _max_shake_roll: float = 0.035   # Максимальный крен в радианах
+
 func _get_event_bus() -> Node:
 	if not is_inside_tree():
 		return null
@@ -31,6 +37,21 @@ func _ready() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	_setup_hud()
 	_find_chess_board()
+	_setup_audio_listener()
+	
+	var bus = _get_event_bus()
+	if bus:
+		if bus.has_signal("piece_captured"):
+			bus.piece_captured.connect(_on_piece_captured)
+		if bus.has_signal("door_knock_triggered"):
+			bus.door_knock_triggered.connect(_on_door_knock_triggered)
+
+func _setup_audio_listener() -> void:
+	if camera != null and camera.get_node_or_null("AudioListener3D") == null:
+		var listener = AudioListener3D.new()
+		listener.name = "AudioListener3D"
+		camera.add_child(listener)
+		listener.make_current()
 
 func _setup_hud() -> void:
 	var canvas = CanvasLayer.new()
@@ -84,6 +105,38 @@ func _unhandled_input(event: InputEvent) -> void:
 	# 3. Выход из-за стола по Escape
 	if event.is_action_pressed("ui_cancel") and is_board_mode:
 		exit_board_mode()
+
+func _process(delta: float) -> void:
+	_update_camera_shake(delta)
+
+## Применение импульса тряски камеры
+func apply_camera_shake(amount: float = 0.6) -> void:
+	_trauma = clampf(_trauma + amount, 0.0, 1.0)
+
+## Обработчик взятия фигуры (сокрушительный удар по доске)
+func _on_piece_captured(_piece_type: String, _is_white: bool) -> void:
+	apply_camera_shake(0.65)
+
+## Обработчик стука в дверь бункера
+func _on_door_knock_triggered(knock_level: int) -> void:
+	apply_camera_shake(0.35 * float(knock_level))
+
+## Обновление тряски камеры со спадом
+func _update_camera_shake(delta: float) -> void:
+	if _trauma <= 0.0:
+		if camera != null:
+			camera.h_offset = 0.0
+			camera.v_offset = 0.0
+			camera.rotation.z = 0.0
+		return
+		
+	_trauma = maxf(0.0, _trauma - _shake_decay * delta)
+	var shake_power: float = _trauma * _trauma
+	
+	if camera != null:
+		camera.h_offset = randf_range(-1.0, 1.0) * _max_shake_offset * shake_power
+		camera.v_offset = randf_range(-1.0, 1.0) * _max_shake_offset * shake_power
+		camera.rotation.z = randf_range(-1.0, 1.0) * _max_shake_roll * shake_power
 
 func _physics_process(delta: float) -> void:
 	# Гравитация
@@ -163,7 +216,35 @@ func enter_board_mode() -> void:
 		if _cam_tween and _cam_tween.is_valid():
 			_cam_tween.kill()
 		_cam_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
-		_cam_tween.tween_property(camera, "global_transform", cam_marker.global_transform, 0.75)
+		
+		# Сбрасываем остаточную тряску
+		_trauma = 0.0
+		camera.h_offset = 0.0
+		camera.v_offset = 0.0
+		camera.rotation.z = 0.0
+		
+		var start_trans: Transform3D = camera.global_transform
+		var start_origin: Vector3 = start_trans.origin
+		var target_origin: Vector3 = cam_marker.global_position
+		
+		# Интерполируем yaw и pitch независимо, строго удерживая roll = 0.
+		# Это полностью исключает крен и заваливание горизонта при подходе к столу с любой стороны.
+		var start_euler: Vector3 = start_trans.basis.orthonormalized().get_euler(EULER_ORDER_YXZ)
+		var target_euler: Vector3 = cam_marker.global_transform.basis.orthonormalized().get_euler(EULER_ORDER_YXZ)
+		
+		var start_yaw: float = start_euler.y
+		var target_yaw: float = target_euler.y
+		var diff_yaw: float = wrapf(target_euler.y - start_euler.y, -PI, PI)
+		var start_pitch: float = start_euler.x
+		var target_pitch: float = target_euler.x
+		
+		_cam_tween.tween_method(func(t: float):
+			var cur_origin: Vector3 = start_origin.lerp(target_origin, t)
+			var cur_yaw: float = start_yaw + diff_yaw * t
+			var cur_pitch: float = lerpf(start_pitch, target_pitch, t)
+			var cur_basis: Basis = Basis.from_euler(Vector3(cur_pitch, cur_yaw, 0.0), EULER_ORDER_YXZ)
+			camera.global_transform = Transform3D(cur_basis, cur_origin)
+		, 0.0, 1.0, 0.75)
 	
 	var bus = _get_event_bus()
 	if bus:

@@ -6,6 +6,7 @@ extends Node3D
 
 const ChessLogicScript = preload("res://scripts/chess/chess_logic.gd")
 const ChessPiece3DScript = preload("res://scripts/chess/chess_piece_3d.gd")
+const VoxelBloodStainScript = preload("res://scripts/chess/voxel_blood_stain.gd")
 
 # Геометрические константы привязки к модели bord.obj
 const ORIGIN_X: float = -4.735
@@ -29,6 +30,7 @@ const STEP_Z: float = -0.5844
 @onready var camera_point: Marker3D = $CameraPoint
 @onready var pieces_container: Node3D = $Pieces
 @onready var highlights_container: Node3D = $Highlights
+@onready var blood_container: Node3D = get_node_or_null("BloodStains")
 @onready var player_turn_sound: AudioStreamPlayer3D = get_node_or_null("PlayerTurnSound")
 @onready var enemy_turn_sound: AudioStreamPlayer3D = get_node_or_null("EnemyTurnSound")
 @onready var capture_sound: AudioStreamPlayer3D = get_node_or_null("CaptureSound")
@@ -41,12 +43,18 @@ var sound_deselect: AudioStream = preload("res://assets/sounds/chess_deselect.wa
 
 var logic: ChessLogic = null
 var piece_nodes: Dictionary = {} # Vector2i -> ChessPiece3D
+var blood_layers: Dictionary = {} # Vector2i -> int (количество взятий на клетке)
 
 # Состояние выбора
 var selected_pos: Vector2i = Vector2i(-1, -1)
 var current_legal_moves: Array[Vector2i] = []
 var is_active: bool = false # Активен ли режим управления шахматами
 var is_ai_thinking: bool = false
+
+# Состояние превращения пешки
+var _promoting_pos: Vector2i = Vector2i(-1, -1)
+var _promoting_node: ChessPiece3D = null
+var _promotion_dialog: CanvasLayer = null
 
 # Материалы для фигур и подсветки
 var white_mat: StandardMaterial3D
@@ -69,6 +77,13 @@ func _ready() -> void:
 	_init_materials()
 	_init_meshes()
 	_setup_audio_players()
+	
+	if blood_container == null:
+		blood_container = get_node_or_null("BloodStains")
+		if blood_container == null:
+			blood_container = Node3D.new()
+			blood_container.name = "BloodStains"
+			add_child(blood_container)
 	
 	logic = ChessLogicScript.new()
 	spawn_pieces()
@@ -147,6 +162,14 @@ func local_pos_to_cell(pos: Vector3) -> Vector2i:
 
 ## Спавн или подключение существующих 32 фигур со сцены
 func spawn_pieces() -> void:
+	clear_blood_stains()
+	if _promotion_dialog != null and is_instance_valid(_promotion_dialog):
+		_promotion_dialog.queue_free()
+		_promotion_dialog = null
+	if _promoting_node != null and is_instance_valid(_promoting_node):
+		_promoting_node.set_selected(false)
+		_promoting_node = null
+		
 	if pieces_container == null:
 		pieces_container = get_node_or_null("Pieces")
 	if pieces_container == null:
@@ -195,6 +218,27 @@ func _on_camera_mode_changed(is_board_mode: bool) -> void:
 
 ## Обработка ввода мыши по доске
 func _unhandled_input(event: InputEvent) -> void:
+	if _promotion_dialog != null and is_instance_valid(_promotion_dialog):
+		if event is InputEventKey and event.pressed and not event.echo:
+			match event.keycode:
+				KEY_1, KEY_Q:
+					_on_promotion_selected(_promoting_pos, _promoting_node, "queen")
+					get_viewport().set_input_as_handled()
+					return
+				KEY_2, KEY_R:
+					_on_promotion_selected(_promoting_pos, _promoting_node, "rook")
+					get_viewport().set_input_as_handled()
+					return
+				KEY_3, KEY_B:
+					_on_promotion_selected(_promoting_pos, _promoting_node, "bishop")
+					get_viewport().set_input_as_handled()
+					return
+				KEY_4, KEY_N, KEY_K:
+					_on_promotion_selected(_promoting_pos, _promoting_node, "knight")
+					get_viewport().set_input_as_handled()
+					return
+		return
+
 	if not is_active or is_ai_thinking or logic.is_game_over:
 		return
 		
@@ -241,6 +285,11 @@ func _on_cell_clicked(cell: Vector2i) -> void:
 			# Повторный клик по уже выбранной фигуре -> отмена выбора
 			cancel_selection()
 		else:
+			# Если до этого была выбрана другая фигура — воспроизводим звук отмены выбора старой фигуры
+			if selected_pos != Vector2i(-1, -1):
+				var prev_node = piece_nodes.get(selected_pos)
+				var sound_pos: Vector3 = prev_node.global_position if (prev_node and prev_node.is_inside_tree()) else global_position
+				_play_deselect_sound(sound_pos)
 			_select_cell(cell)
 		return
 		
@@ -344,22 +393,33 @@ func _execute_player_move(from_pos: Vector2i, to_pos: Vector2i) -> void:
 	if not piece_node:
 		return
 		
+	var is_pawn_promotion: bool = (piece_node.piece_type == "pawn" and piece_node.is_white and to_pos.y == 7)
+	
 	var move_res = logic.make_move(from_pos, to_pos)
 	if not move_res["success"]:
 		return
 		
 	var bus = _get_event_bus()
 	
+	# Обработка рокировки (анимация перемещения ладьи)
+	if move_res.get("castled", false):
+		var r_from: Vector2i = move_res["rook_from"]
+		var r_to: Vector2i = move_res["rook_to"]
+		var rook_node = piece_nodes.get(r_from)
+		if rook_node:
+			piece_nodes.erase(r_from)
+			piece_nodes[r_to] = rook_node
+			rook_node.board_pos = r_to
+			var r_target_world: Vector3 = to_global(cell_to_local_pos(r_to))
+			rook_node.animate_to(r_target_world, white_move_duration, false)
+			if bus:
+				bus.piece_moved.emit(r_from, r_to)
+	
 	# Обработка взятия
 	var is_capture: bool = move_res["captured"]
+	var victim_node = piece_nodes.get(to_pos) if is_capture else null
 	if is_capture:
-		var victim_node = piece_nodes.get(to_pos)
-		if victim_node:
-			victim_node.animate_capture()
-			piece_nodes.erase(to_pos)
-			
-		if bus:
-			bus.piece_captured.emit(move_res["captured_piece"], move_res["captured_is_white"])
+		piece_nodes.erase(to_pos)
 			
 	# Перемещение 3D-ноды (ход игрока белыми — дуговой перенос)
 	piece_nodes.erase(from_pos)
@@ -367,33 +427,46 @@ func _execute_player_move(from_pos: Vector2i, to_pos: Vector2i) -> void:
 	piece_node.board_pos = to_pos
 	var target_world_pos: Vector3 = to_global(cell_to_local_pos(to_pos))
 	
-	if white_move_duration <= 0.05:
+	var on_move_finished = func():
 		if is_capture:
 			_play_capture_sound(target_world_pos)
+			if victim_node:
+				victim_node.animate_capture(0.25)
+			# Процедурное воксельное пятно крови на клетке гибели фигуры
+			spawn_blood_stain(to_pos)
+			# Окрашиваем фигуру-убийцу кровью
+			if piece_node:
+				piece_node.apply_blood_stain()
+			if bus:
+				bus.piece_captured.emit(move_res["captured_piece"], move_res["captured_is_white"])
 		else:
 			_play_player_move_sound(target_world_pos)
+			
+		if is_pawn_promotion:
+			# Поднимаем пешку над доской как при выборе фигуры
+			piece_node.set_selected(true)
+			# Показываем модальное окно выбора фигуры для превращения
+			_show_promotion_dialog(to_pos, piece_node)
+		else:
+			if move_res["is_checkmate"]:
+				if bus:
+					bus.game_over.emit(logic.winner)
+				return
+				
+			# Ход ИИ (Черные) с атмосферной задержкой после завершения хода белых
+			is_ai_thinking = true
+			var timer = get_tree().create_timer(ai_turn_delay)
+			timer.timeout.connect(_execute_ai_turn)
+	
+	if white_move_duration <= 0.05:
+		on_move_finished.call()
 		piece_node.animate_to(target_world_pos, white_move_duration, false)
 	else:
-		piece_node.animate_to(target_world_pos, white_move_duration, false, func():
-			if is_capture:
-				_play_capture_sound(target_world_pos)
-			else:
-				_play_player_move_sound(target_world_pos)
-		)
+		piece_node.animate_to(target_world_pos, white_move_duration, false, on_move_finished)
 	
 	if bus:
 		bus.piece_moved.emit(from_pos, to_pos)
 		bus.player_made_action.emit()
-		
-	if move_res["is_checkmate"]:
-		if bus:
-			bus.game_over.emit(logic.winner)
-		return
-		
-	# Ход ИИ (Черные) с атмосферной задержкой после завершения хода белых
-	is_ai_thinking = true
-	var timer = get_tree().create_timer(white_move_duration + ai_turn_delay)
-	timer.timeout.connect(_execute_ai_turn)
 
 ## Ход ИИ войны
 func _execute_ai_turn() -> void:
@@ -419,15 +492,31 @@ func _execute_ai_turn() -> void:
 		return
 		
 	var bus = _get_event_bus()
+	
+	# Обработка рокировки черных (анимация ладьи)
+	if move_res.get("castled", false):
+		var r_from: Vector2i = move_res["rook_from"]
+		var r_to: Vector2i = move_res["rook_to"]
+		var rook_node = piece_nodes.get(r_from)
+		if rook_node:
+			piece_nodes.erase(r_from)
+			piece_nodes[r_to] = rook_node
+			rook_node.board_pos = r_to
+			var r_target_world: Vector3 = to_global(cell_to_local_pos(r_to))
+			rook_node.animate_to(r_target_world, black_move_duration, true)
+			if bus:
+				bus.piece_moved.emit(r_from, r_to)
+				
 	# Обработка взятия белой фигуры
-	if move_res["captured"]:
-		var victim_node = piece_nodes.get(to_pos)
-		if victim_node:
-			victim_node.animate_capture(black_move_duration * 0.5)
-			piece_nodes.erase(to_pos)
+	var is_ai_capture: bool = move_res["captured"]
+	var victim_node = piece_nodes.get(to_pos) if is_ai_capture else null
+	if is_ai_capture:
+		piece_nodes.erase(to_pos)
 			
-		if bus:
-			bus.piece_captured.emit(move_res["captured_piece"], move_res["captured_is_white"])
+	# Превращение пешки черных в ферзя
+	if move_res.get("promoted", false):
+		var promo_mesh: Mesh = meshes.get("queen_black", meshes.get("queen", meshes["pawn"]))
+		piece_node.change_type("queen", promo_mesh, black_mat)
 			
 	# Медленное скольжение черной фигуры строго по доске (для звука скрежета)
 	piece_nodes.erase(from_pos)
@@ -440,6 +529,17 @@ func _execute_ai_turn() -> void:
 	
 	piece_node.animate_to(target_world_pos, black_move_duration, true, func():
 		_stop_enemy_move_sound()
+		if is_ai_capture:
+			_play_capture_sound(target_world_pos)
+			if victim_node:
+				victim_node.animate_capture(0.25)
+			# Процедурное воксельное пятно крови на клетке гибели фигуры
+			spawn_blood_stain(to_pos)
+			# Окрашиваем фигуру-убийцу черных кровью
+			if piece_node:
+				piece_node.apply_blood_stain()
+			if bus:
+				bus.piece_captured.emit(move_res["captured_piece"], move_res["captured_is_white"])
 	)
 	
 	if bus:
@@ -454,6 +554,251 @@ func _execute_ai_turn() -> void:
 			if bus:
 				bus.game_over.emit(logic.winner)
 	)
+
+# ==============================================================================
+# ПРЕВРАЩЕНИЕ ПЕШКИ (Pawn Promotion UI)
+# ==============================================================================
+
+## Отображение модального диалога выбора фигуры для превращения пешки
+func _show_promotion_dialog(cell: Vector2i, piece_node: ChessPiece3D) -> void:
+	_promoting_pos = cell
+	_promoting_node = piece_node
+	
+	if _promotion_dialog != null and is_instance_valid(_promotion_dialog):
+		_promotion_dialog.queue_free()
+		
+	var canvas = CanvasLayer.new()
+	canvas.name = "PromotionCanvas"
+	canvas.layer = 15
+	add_child(canvas)
+	_promotion_dialog = canvas
+	
+	# Легкое затемнение фона, позволяющее видеть приподнятую пешку на доске
+	var overlay = ColorRect.new()
+	overlay.color = Color(0.0, 0.0, 0.0, 0.45)
+	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	canvas.add_child(overlay)
+	
+	var center = CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	canvas.add_child(center)
+	
+	var vbox = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 18)
+	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	center.add_child(vbox)
+	
+	# Заголовок "ПРЕВРАЩЕНИЕ ПЕШКИ"
+	var title = Label.new()
+	title.text = "ПРЕВРАЩЕНИЕ ПЕШКИ"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 22)
+	title.add_theme_color_override("font_color", Color(0.94, 0.91, 0.82))
+	title.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.8))
+	title.add_theme_constant_override("shadow_offset_x", 1)
+	title.add_theme_constant_override("shadow_offset_y", 2)
+	vbox.add_child(title)
+	
+	# Ряд полупрозрачных карточек с 3D-моделями фигур
+	var hbox = HBoxContainer.new()
+	hbox.add_theme_constant_override("separation", 16)
+	hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	vbox.add_child(hbox)
+	
+	var options: Array[Dictionary] = [
+		{ "type": "queen", "name": "Ферзь" },
+		{ "type": "rook", "name": "Ладья" },
+		{ "type": "bishop", "name": "Слон" },
+		{ "type": "knight", "name": "Конь" }
+	]
+	
+	for opt in options:
+		var card_btn = Button.new()
+		card_btn.custom_minimum_size = Vector2(115, 155)
+		card_btn.text = ""
+		card_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		
+		# Стиль карточки: полупрозрачный темный фон
+		var normal_style = StyleBoxFlat.new()
+		normal_style.bg_color = Color(0.09, 0.09, 0.11, 0.65)
+		normal_style.border_color = Color(0.48, 0.45, 0.38, 0.55)
+		normal_style.set_border_width_all(1)
+		normal_style.set_corner_radius_all(6)
+		normal_style.shadow_color = Color(0.0, 0.0, 0.0, 0.45)
+		normal_style.shadow_size = 6
+		card_btn.add_theme_stylebox_override("normal", normal_style)
+		
+		var hover_style = StyleBoxFlat.new()
+		hover_style.bg_color = Color(0.20, 0.18, 0.13, 0.85)
+		hover_style.border_color = Color(0.96, 0.86, 0.55, 0.95)
+		hover_style.set_border_width_all(2)
+		hover_style.set_corner_radius_all(6)
+		hover_style.shadow_color = Color(0.96, 0.86, 0.55, 0.25)
+		hover_style.shadow_size = 10
+		card_btn.add_theme_stylebox_override("hover", hover_style)
+		
+		var pressed_style = StyleBoxFlat.new()
+		pressed_style.bg_color = Color(0.28, 0.24, 0.16, 0.95)
+		pressed_style.border_color = Color(1.0, 0.92, 0.65, 1.0)
+		pressed_style.set_border_width_all(2)
+		pressed_style.set_corner_radius_all(6)
+		card_btn.add_theme_stylebox_override("pressed", pressed_style)
+		
+		var focus_style = StyleBoxEmpty.new()
+		card_btn.add_theme_stylebox_override("focus", focus_style)
+		
+		# Внутренний контейнер с отступами
+		var margin = MarginContainer.new()
+		margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+		margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		margin.add_theme_constant_override("margin_left", 6)
+		margin.add_theme_constant_override("margin_top", 6)
+		margin.add_theme_constant_override("margin_right", 6)
+		margin.add_theme_constant_override("margin_bottom", 6)
+		card_btn.add_child(margin)
+		
+		var card_vbox = VBoxContainer.new()
+		card_vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		card_vbox.add_theme_constant_override("separation", 4)
+		margin.add_child(card_vbox)
+		
+		# 3D Viewport для отображения фигуры
+		var vp_container = SubViewportContainer.new()
+		vp_container.custom_minimum_size = Vector2(103, 110)
+		vp_container.stretch = true
+		vp_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		card_vbox.add_child(vp_container)
+		
+		var vp = SubViewport.new()
+		vp.size = Vector2i(103, 110)
+		vp.transparent_bg = true
+		vp.own_world_3d = true
+		vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+		vp_container.add_child(vp)
+		
+		# Освещение в SubViewport (теплый свет сверху-спереди + мягкий контурный свет)
+		var key_light = DirectionalLight3D.new()
+		key_light.rotation_degrees = Vector3(-35, 30, 0)
+		key_light.light_color = Color(1.0, 0.96, 0.88)
+		key_light.light_energy = 1.6
+		vp.add_child(key_light)
+		
+		var rim_light = DirectionalLight3D.new()
+		rim_light.rotation_degrees = Vector3(25, -150, 0)
+		rim_light.light_color = Color(0.65, 0.75, 0.90)
+		rim_light.light_energy = 0.7
+		vp.add_child(rim_light)
+		
+		# Камера, сфокусированная на фигуре
+		var cam = Camera3D.new()
+		cam.projection = Camera3D.PROJECTION_PERSPECTIVE
+		cam.fov = 38.0
+		cam.look_at_from_position(Vector3(0.0, 0.58, 1.85), Vector3(0.0, 0.54, 0.0))
+		vp.add_child(cam)
+		
+		# 3D-модель фигуры
+		var pivot = Node3D.new()
+		pivot.position = Vector3(0.0, 0.0, 0.0)
+		vp.add_child(pivot)
+		
+		var mesh_node = MeshInstance3D.new()
+		var p_key: String = opt["type"] + "_white"
+		mesh_node.mesh = meshes.get(p_key, meshes.get(opt["type"]))
+		mesh_node.material_override = white_mat
+		pivot.add_child(mesh_node)
+		
+		# Плавное вращение фигуры на 360 градусов
+		var spin_tween = vp.create_tween().set_loops()
+		spin_tween.tween_property(pivot, "rotation_degrees:y", 360.0, 8.0).from(0.0)
+		
+		# Название фигуры
+		var name_lbl = Label.new()
+		name_lbl.text = opt["name"]
+		name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		name_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		name_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		name_lbl.add_theme_font_size_override("font_size", 14)
+		name_lbl.add_theme_color_override("font_color", Color(0.90, 0.88, 0.82))
+		card_vbox.add_child(name_lbl)
+		
+		# Интерактивность при наведении курсора
+		card_btn.mouse_entered.connect(func():
+			name_lbl.add_theme_color_override("font_color", Color(1.0, 0.92, 0.65))
+		)
+		card_btn.mouse_exited.connect(func():
+			name_lbl.add_theme_color_override("font_color", Color(0.90, 0.88, 0.82))
+		)
+		
+		var chosen: String = opt["type"]
+		card_btn.pressed.connect(func(): _on_promotion_selected(cell, piece_node, chosen))
+		hbox.add_child(card_btn)
+
+## Обработка выбора фигуры для превращения
+func _on_promotion_selected(cell: Vector2i, piece_node: ChessPiece3D, chosen_type: String) -> void:
+	if _promotion_dialog != null and is_instance_valid(_promotion_dialog):
+		_promotion_dialog.queue_free()
+		_promotion_dialog = null
+		
+	if piece_node == null and piece_nodes.has(cell):
+		piece_node = piece_nodes[cell]
+		
+	_promoting_pos = Vector2i(-1, -1)
+	_promoting_node = null
+	
+	# 1. Обновляем тип в логике
+	logic.promote_pawn(cell, chosen_type)
+	
+	# 2. Обновляем 3D-модель фигуры и опускаем её обратно на доску
+	if piece_node:
+		var key: String = chosen_type + "_white"
+		var new_mesh: Mesh = meshes.get(key, meshes.get(chosen_type, meshes["queen"]))
+		piece_node.change_type(chosen_type, new_mesh, white_mat)
+		piece_node.set_selected(false)
+		_play_player_move_sound(piece_node.global_position)
+		
+	var bus = _get_event_bus()
+	if logic.is_game_over:
+		if bus:
+			bus.game_over.emit(logic.winner)
+		return
+		
+	# 3. Передаем ход черному ИИ
+	is_ai_thinking = true
+	var timer = get_tree().create_timer(ai_turn_delay)
+	timer.timeout.connect(_execute_ai_turn)
+
+# ==============================================================================
+# ВОКСЕЛЬНЫЕ ПЯТНА КРОВИ (Voxel Blood Stains)
+# ==============================================================================
+
+## Создание процедурного воксельного пятна крови на клетке доски при взятии фигуры
+func spawn_blood_stain(cell: Vector2i) -> Node3D:
+	if blood_container == null:
+		blood_container = get_node_or_null("BloodStains")
+		if blood_container == null:
+			blood_container = Node3D.new()
+			blood_container.name = "BloodStains"
+			add_child(blood_container)
+			
+	var layer_idx: int = blood_layers.get(cell, 0)
+	blood_layers[cell] = layer_idx + 1
+	
+	var stain = VoxelBloodStainScript.new()
+	var local_cell_pos: Vector3 = cell_to_local_pos(cell)
+	blood_container.add_child(stain)
+	stain.create_stain(local_cell_pos, layer_idx, true)
+	return stain
+
+## Очистка всех воксельных пятен крови (при сбросе доски / новой партии)
+func clear_blood_stains() -> void:
+	blood_layers.clear()
+	if blood_container == null:
+		blood_container = get_node_or_null("BloodStains")
+	if blood_container != null:
+		for child in blood_container.get_children():
+			child.queue_free()
 
 # ==============================================================================
 # ЗВУКИ ПЕРЕМЕЩЕНИЯ ФИГУР (Player & Enemy Turn Audio)

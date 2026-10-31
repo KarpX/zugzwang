@@ -4,7 +4,6 @@
 
 [resource]
 resource_name = "bord_material"
-cull_mode = 0
 albedo_texture = ExtResource("1_tex")
 metallic_specular = 0.25
 roughness = 0.68

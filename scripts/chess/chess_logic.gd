@@ -182,7 +182,7 @@ func _get_sliding_moves(pos: Vector2i, is_white: bool, directions: Array[Vector2
 			current += dir
 	return moves
 
-## Правила хода короля (1 клетка в любом направлении)
+## Правила хода короля (1 клетка в любом направлении + рокировка)
 func _get_king_moves(pos: Vector2i, is_white: bool) -> Array[Vector2i]:
 	var moves: Array[Vector2i] = []
 	for dx in [-1, 0, 1]:
@@ -192,7 +192,37 @@ func _get_king_moves(pos: Vector2i, is_white: bool) -> Array[Vector2i]:
 			var target: Vector2i = Vector2i(pos.x + dx, pos.y + dy)
 			if is_inside(target) and not is_friendly(target, is_white):
 				moves.append(target)
+				
+	_add_castling_moves(pos, is_white, moves)
 	return moves
+
+## Проверка и добавление ходов рокировки для короля
+func _add_castling_moves(pos: Vector2i, is_white: bool, moves: Array[Vector2i]) -> void:
+	var king_piece = get_piece(pos)
+	if king_piece == null or king_piece["has_moved"]:
+		return
+		
+	var expected_y: int = 0 if is_white else 7
+	if pos != Vector2i(4, expected_y):
+		return
+		
+	# Нельзя рокироваться, находясь под шахом
+	if is_square_attacked(pos, not is_white):
+		return
+		
+	# 1. Короткая рокировка (Kingside O-O: ладья на x=7)
+	var ks_rook = get_piece(Vector2i(7, expected_y))
+	if ks_rook != null and ks_rook["type"] == "rook" and ks_rook["is_white"] == is_white and not ks_rook["has_moved"]:
+		if is_empty(Vector2i(5, expected_y)) and is_empty(Vector2i(6, expected_y)):
+			if not is_square_attacked(Vector2i(5, expected_y), not is_white) and not is_square_attacked(Vector2i(6, expected_y), not is_white):
+				moves.append(Vector2i(6, expected_y))
+				
+	# 2. Длинная рокировка (Queenside O-O-O: ладья на x=0)
+	var qs_rook = get_piece(Vector2i(0, expected_y))
+	if qs_rook != null and qs_rook["type"] == "rook" and qs_rook["is_white"] == is_white and not qs_rook["has_moved"]:
+		if is_empty(Vector2i(1, expected_y)) and is_empty(Vector2i(2, expected_y)) and is_empty(Vector2i(3, expected_y)):
+			if not is_square_attacked(Vector2i(3, expected_y), not is_white) and not is_square_attacked(Vector2i(2, expected_y), not is_white):
+				moves.append(Vector2i(2, expected_y))
 
 ## Поиск положения короля
 func find_king(is_white: bool) -> Vector2i:
@@ -273,6 +303,7 @@ func _does_move_leave_king_in_check(from_pos: Vector2i, to_pos: Vector2i, is_whi
 	return in_check
 
 ## Выполнение хода на доске
+## promotion_type: фигура при превращении пешки ("queen", "rook", "bishop", "knight")
 ## Возвращает словарь с результатом:
 ## {
 ##   "success": bool,
@@ -280,16 +311,28 @@ func _does_move_leave_king_in_check(from_pos: Vector2i, to_pos: Vector2i, is_whi
 ##   "captured_piece": String,
 ##   "captured_is_white": bool,
 ##   "is_checkmate": bool,
-##   "promoted": bool
+##   "promoted": bool,
+##   "promoted_to": String,
+##   "promotion_pos": Vector2i,
+##   "is_promotion": bool,
+##   "castled": bool,
+##   "rook_from": Vector2i,
+##   "rook_to": Vector2i
 ## }
-func make_move(from_pos: Vector2i, to_pos: Vector2i) -> Dictionary:
+func make_move(from_pos: Vector2i, to_pos: Vector2i, promotion_type: String = "queen") -> Dictionary:
 	var result: Dictionary = {
 		"success": false,
 		"captured": false,
 		"captured_piece": "",
 		"captured_is_white": false,
 		"is_checkmate": false,
-		"promoted": false
+		"promoted": false,
+		"promoted_to": "",
+		"promotion_pos": Vector2i(-1, -1),
+		"is_promotion": false,
+		"castled": false,
+		"rook_from": Vector2i(-1, -1),
+		"rook_to": Vector2i(-1, -1)
 	}
 	
 	var legal_moves = get_legal_moves(from_pos)
@@ -298,6 +341,29 @@ func make_move(from_pos: Vector2i, to_pos: Vector2i) -> Dictionary:
 		
 	var piece = grid[from_pos.x][from_pos.y]
 	var target = grid[to_pos.x][to_pos.y]
+	
+	# Проверка рокировки (король делает ход на 2 клетки по горизонтали)
+	if piece["type"] == "king" and abs(to_pos.x - from_pos.x) == 2:
+		var rook_from: Vector2i = Vector2i(-1, -1)
+		var rook_to: Vector2i = Vector2i(-1, -1)
+		if to_pos.x == 6:
+			# Короткая рокировка (O-O)
+			rook_from = Vector2i(7, from_pos.y)
+			rook_to = Vector2i(5, from_pos.y)
+		elif to_pos.x == 2:
+			# Длинная рокировка (O-O-O)
+			rook_from = Vector2i(0, from_pos.y)
+			rook_to = Vector2i(3, from_pos.y)
+			
+		var rook_piece = grid[rook_from.x][rook_from.y]
+		grid[rook_to.x][rook_to.y] = rook_piece
+		grid[rook_from.x][rook_from.y] = null
+		if rook_piece != null:
+			rook_piece["has_moved"] = true
+			
+		result["castled"] = true
+		result["rook_from"] = rook_from
+		result["rook_to"] = rook_to
 	
 	# Проверка взятия
 	if target != null:
@@ -310,29 +376,50 @@ func make_move(from_pos: Vector2i, to_pos: Vector2i) -> Dictionary:
 	grid[from_pos.x][from_pos.y] = null
 	piece["has_moved"] = true
 	
-	# Превращение пешки в ферзя на последней горизонтали
+	# Превращение пешки на последней горизонтали
 	if piece["type"] == "pawn":
 		if (piece["is_white"] and to_pos.y == 7) or (not piece["is_white"] and to_pos.y == 0):
-			piece["type"] = "queen"
+			var promo: String = promotion_type if promotion_type != "" else "queen"
+			piece["type"] = promo
 			result["promoted"] = true
+			result["promoted_to"] = promo
+			result["promotion_pos"] = to_pos
+			result["is_promotion"] = true
 			
 	move_count += 1
 	is_white_turn = not is_white_turn
 	result["success"] = true
 	
 	# Проверка мата следующему игроку
+	_update_game_over_state()
+	if is_game_over and winner != "draw":
+		result["is_checkmate"] = true
+			
+	return result
+
+## Смена типа фигуры при выборе игроком (ферзь, ладья, слон, конь)
+func promote_pawn(pos: Vector2i, new_type: String) -> void:
+	if not is_inside(pos):
+		return
+	var piece = grid[pos.x][pos.y]
+	if piece != null and new_type in ["queen", "rook", "bishop", "knight"]:
+		piece["type"] = new_type
+		_update_game_over_state()
+
+## Пересчет состояния окончания партии (шах, мат, пат)
+func _update_game_over_state() -> void:
 	var next_has_moves: bool = has_any_legal_moves(is_white_turn)
 	if not next_has_moves:
 		var king_pos = find_king(is_white_turn)
 		if king_pos != Vector2i(-1, -1) and is_square_attacked(king_pos, not is_white_turn):
 			is_game_over = true
 			winner = "white" if not is_white_turn else "black"
-			result["is_checkmate"] = true
 		else:
 			is_game_over = true
 			winner = "draw"
-			
-	return result
+	else:
+		is_game_over = false
+		winner = ""
 
 ## Проверка, есть ли хотя бы один легальный ход у стороны
 func has_any_legal_moves(is_white: bool) -> bool:
@@ -391,6 +478,14 @@ func _evaluate_move(from_pos: Vector2i, to_pos: Vector2i) -> float:
 		
 	# 2. Продвижение черных вперед (к игроку: Y уменьшается от 7 до 0)
 	score += (7.0 - to_pos.y) * 2.0
+	
+	# Бонус за превращение пешки черных в ферзя
+	if piece["type"] == "pawn" and to_pos.y == 0:
+		score += 850.0
+		
+	# Бонус за рокировку черного короля в безопасность
+	if piece["type"] == "king" and abs(to_pos.x - from_pos.x) == 2:
+		score += 45.0
 	
 	# 3. Контроль центра (клетки 3,4 по X и Y)
 	var center_dist: float = abs(to_pos.x - 3.5) + abs(to_pos.y - 3.5)

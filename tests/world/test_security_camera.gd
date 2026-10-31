@@ -41,17 +41,54 @@ func _run_tests() -> void:
 	assert(pivot.target == player, "Камера должна автоматически обнаружить игрока как цель")
 	print("[PASS] Тест 2: Камера автоматически захватывает игрока как цель")
 	
-	# Тестируем шаг слежения в кадре
+	# Тестируем шаг слежения в кадре: приведение цели к границе видимости
 	for i in range(10):
 		pivot._process(0.1)
 		
 	var dir_to_player = ((player.global_position + Vector3(0, pivot.vertical_offset, 0)) - pivot.global_position).normalized()
 	var forward_cam = -pivot.global_basis.z
 	
-	# Проверяем, что вектор взгляда камеры направлен на игрока
+	# Проверяем, что вектор взгляда камеры удерживает игрока в поле зрения
 	var dot_product = forward_cam.dot(dir_to_player)
 	assert(dot_product > 0.85, "Камера должна направлять свой передний вектор (-Z) в сторону игрока (dot = %.3f)" % dot_product)
-	print("[PASS] Тест 3: Шаг слежения плавно направляет камеру на игрока (dot = %.3f)" % dot_product)
+	print("[PASS] Тест 3: Шаг слежения направляет камеру к границе поля зрения игрока (dot = %.3f)" % dot_product)
+	
+	# Тест 4: Неподвижность камеры при перемещениях игрока ВНУТРИ поля зрения
+	var player_center_target = player.global_position + Vector3(0.0, pivot.vertical_offset, 0.0)
+	var direct_look = pivot.global_transform.looking_at(player_center_target, Vector3.UP)
+	pivot.global_basis = direct_look.basis
+	
+	var initial_basis = pivot.global_basis
+	# Делаем небольшой шаг игроком внутри поля зрения (смещение на 0.3 метра)
+	player.global_position += Vector3(0.0, 0.0, 0.3)
+	pivot._process(0.05)
+	
+	var angle_diff = initial_basis.get_rotation_quaternion().angle_to(pivot.global_basis.get_rotation_quaternion())
+	assert(angle_diff < 0.001, "Камера не должна двигаться, пока игрок внутри поля зрения (angle_diff = %.4f)" % angle_diff)
+	assert(pivot.camera_sound == null or not pivot.camera_sound.playing, "Звук сервопривода не должен играть при шагах внутри поля зрения")
+	print("[PASS] Тест 4: Камера неподвижна, пока игрок перемещается внутри поля зрения")
+	
+	# Тест 5: Движение камеры только при выходе игрока за границу поля зрения
+	# Смещаем игрока перпендикулярно лучу зрения на 12 метров (угол станет около 40°)
+	player.global_position += Vector3(0.0, 0.0, 12.0)
+	var basis_before_push = pivot.global_basis
+	pivot._process(0.1)
+	
+	var angle_moved = basis_before_push.get_rotation_quaternion().angle_to(pivot.global_basis.get_rotation_quaternion())
+	assert(angle_moved > 0.01, "Камера должна повернуться, когда игрок смещает границу поля зрения (angle_moved = %.4f)" % angle_moved)
+	print("[PASS] Тест 5: Камера поворачивается при выходе игрока за границу поля зрения (angle_moved = %.4f)" % angle_moved)
+	
+	# Тест 6: Остановка камеры, когда игрок прекращает движение и доворачивает до границы
+	for i in range(25):
+		pivot._process(0.1)
+	
+	# Теперь игрок стоит на месте, проверяем следующий кадр
+	var basis_at_rest = pivot.global_basis
+	pivot._process(0.016)
+	var angle_at_rest = basis_at_rest.get_rotation_quaternion().angle_to(pivot.global_basis.get_rotation_quaternion())
+	assert(angle_at_rest < 0.001, "Камера должна немедленно остановиться, когда игрок перестал двигать границу (angle_at_rest = %.4f)" % angle_at_rest)
+	assert(pivot.camera_sound == null or not pivot.camera_sound.playing, "Звук должен выключаться при остановке движения границы")
+	print("[PASS] Тест 6: Камера немедленно останавливается, когда игрок перестает двигать границу")
 	
 	room.free()
 	print("--- [Security Camera Test] ВСЕ ТЕСТЫ УСПЕШНО ПРОЙДЕНЫ ---")
