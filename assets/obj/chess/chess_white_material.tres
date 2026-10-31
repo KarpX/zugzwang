@@ -1,0 +1,10 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://chesswhitemat01"]
+
+[ext_resource type="Texture2D" uid="uid://chesswhitetex01" path="res://assets/obj/chess/chess_white.png" id="1_tex"]
+
+[resource]
+resource_name = "chess_white_material"
+albedo_texture = ExtResource("1_tex")
+roughness = 0.45
+metallic = 0.05
+texture_filter = 0

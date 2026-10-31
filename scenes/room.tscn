@@ -15,6 +15,8 @@
 [ext_resource type="Material" uid="uid://bulbglow001" path="res://assets/obj/bulb_glow.tres" id="8_bulbglow"]
 [ext_resource type="Script" uid="uid://ga1xv3l03hki" path="res://scripts/hanging_lamp.gd" id="9_lamp_script"]
 [ext_resource type="Material" uid="uid://tablemat001" path="res://assets/obj/table_material.tres" id="10_tablemat"]
+[ext_resource type="Material" uid="uid://cambasemat01" path="res://assets/obj/camera_base_material.tres" id="11_cambasemat"]
+[ext_resource type="Material" uid="uid://cammaterial01" path="res://assets/obj/camera_material.tres" id="12_cammat"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_x5vg1"]
 size = Vector3(40.07849, 13.515747, 0.60009766)
@@ -103,6 +105,7 @@ mesh = ExtResource("2_qvc4m")
 
 [node name="CameraBase" type="MeshInstance3D" parent="walls" unique_id=1965094053]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.332, 9.019, 2.05)
+material_override = ExtResource("11_cambasemat")
 mesh = ExtResource("3_7dqbv")
 
 [node name="CameraPivot" type="Node3D" parent="walls/CameraBase" unique_id=1142422552]
@@ -111,6 +114,7 @@ script = ExtResource("6_seccam")
 
 [node name="CameraMesh" type="MeshInstance3D" parent="walls/CameraBase/CameraPivot" unique_id=1142422556]
 transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 0.2, -0.4, -1.2)
+material_override = ExtResource("12_cammat")
 mesh = ExtResource("4_ybpoa")
 
 [node name="NightVisionSpotLight" type="SpotLight3D" parent="walls/CameraBase/CameraPivot" unique_id=1142422553]
@@ -186,7 +190,7 @@ is_swinging = true
 [node name="OmniLight3D" type="OmniLight3D" parent="HangingBulb" unique_id=1332429521]
 transform = Transform3D(4, 0, 0, 0, 4, 0, 0, 0, 4, 0, -14.1, 0)
 light_color = Color(1, 0.9411765, 0.6627451, 1)
-light_energy = 0.785
+light_energy = 1.005
 light_bake_mode = 1
 shadow_enabled = true
 shadow_bias = 0.05

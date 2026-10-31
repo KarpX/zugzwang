@@ -40,6 +40,10 @@ func setup(type: String, white: bool, pos: Vector2i, piece_mesh: Mesh, piece_mat
 	if piece_mesh:
 		var aabb: AABB = piece_mesh.get_aabb()
 		mesh_instance.position.y = -aabb.position.y
+		
+	# Поворот фигуры (Конь смотрит на оппонента: белые на -Z (180°), черные на +Z (0°))
+	if type == "knight":
+		mesh_instance.rotation_degrees.y = 180.0 if is_white else 0.0
 
 ## Плавное перемещение фигуры по доске
 ## is_glide: если true, фигура не приподнимается, а монотонно "плывет" по доске (эффект скрежета черных)
