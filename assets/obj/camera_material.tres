@@ -1,0 +1,9 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://cammaterial01"]
+
+[ext_resource type="Texture2D" uid="uid://b0wtvhitjn582" path="res://assets/obj/camera.png" id="1_tex"]
+
+[resource]
+resource_name = "camera_material"
+albedo_texture = ExtResource("1_tex")
+roughness = 0.5
+texture_filter = 0

@@ -1,0 +1,9 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://floormat001"]
+
+[ext_resource type="Texture2D" uid="uid://dhf5cjr7wjkwj" path="res://assets/obj/floor.png" id="1_tex"]
+
+[resource]
+resource_name = "floor_material"
+albedo_texture = ExtResource("1_tex")
+roughness = 0.6
+texture_filter = 0

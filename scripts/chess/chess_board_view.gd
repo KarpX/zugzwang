@@ -69,17 +69,11 @@ func _ready() -> void:
 		bus.camera_mode_changed.connect(_on_camera_mode_changed)
 
 func _init_materials() -> void:
-	# Белые: мраморный кремово-белый
-	white_mat = StandardMaterial3D.new()
-	white_mat.albedo_color = Color(0.88, 0.86, 0.82)
-	white_mat.roughness = 0.35
-	white_mat.metallic = 0.05
+	# Белые: турнирный самшит с красным фетровым основанием
+	white_mat = preload("res://assets/obj/chess/chess_white_material.tres")
 	
-	# Черные: обсидиановый темный графит
-	black_mat = StandardMaterial3D.new()
-	black_mat.albedo_color = Color(0.12, 0.12, 0.14)
-	black_mat.roughness = 0.25
-	black_mat.metallic = 0.3
+	# Черные: мореный дуб / эбен с темно-красным фетровым основанием
+	black_mat = preload("res://assets/obj/chess/chess_black_material.tres")
 	
 	# Подсветка доступного хода (зеленый/белый неоновый маркер)
 	move_highlight_mat = StandardMaterial3D.new()
@@ -106,39 +100,12 @@ func _init_materials() -> void:
 	select_highlight_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 
 func _init_meshes() -> void:
-	# Пешка
-	var pawn_box = BoxMesh.new()
-	pawn_box.size = Vector3(0.36, 0.44, 0.34)
-	meshes["pawn"] = pawn_box
-	
-	# Ладья
-	var rook_box = BoxMesh.new()
-	rook_box.size = Vector3(0.38, 0.85, 0.38)
-	meshes["rook"] = rook_box
-	
-	# Конь
-	var knight_cyl = CylinderMesh.new()
-	knight_cyl.top_radius = 0.14
-	knight_cyl.bottom_radius = 0.16
-	knight_cyl.height = 0.65
-	meshes["knight"] = knight_cyl
-	
-	# Слон
-	var bishop_cap = CapsuleMesh.new()
-	bishop_cap.radius = 0.16
-	bishop_cap.height = 0.95
-	meshes["bishop"] = bishop_cap
-	
-	# Ферзь
-	var queen_sph = SphereMesh.new()
-	queen_sph.radius = 0.24
-	queen_sph.height = 0.48
-	meshes["queen"] = queen_sph
-	
-	# Король
-	var king_prism = PrismMesh.new()
-	king_prism.size = Vector3(0.42, 0.95, 0.42)
-	meshes["king"] = king_prism
+	meshes["pawn"] = preload("res://assets/obj/chess/pawn.obj")
+	meshes["rook"] = preload("res://assets/obj/chess/rook.obj")
+	meshes["knight"] = preload("res://assets/obj/chess/knight.obj")
+	meshes["bishop"] = preload("res://assets/obj/chess/bishop.obj")
+	meshes["queen"] = preload("res://assets/obj/chess/queen.obj")
+	meshes["king"] = preload("res://assets/obj/chess/king.obj")
 
 ## Преобразование координат клетки доски (file 0..7, rank 0..7) в локальные 3D-координаты
 func cell_to_local_pos(cell: Vector2i) -> Vector3:

@@ -69,7 +69,7 @@ func _ready() -> void:
 	piece_captured.connect(_on_piece_captured)
 	game_over.connect(_on_game_over)
 
-func _on_piece_captured(piece_type: String, is_white: bool) -> void:
+func _on_piece_captured(_piece_type: String, is_white: bool) -> void:
 	total_losses += 1
 	if is_white:
 		white_losses += 1
@@ -108,4 +108,3 @@ func reset_game_state() -> void:
 	current_stage = 1
 	is_in_board_mode = false
 	is_game_finished = false
-
