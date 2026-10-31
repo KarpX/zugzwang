@@ -109,8 +109,7 @@ func _init_materials() -> void:
 	move_highlight_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	move_highlight_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	move_highlight_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	move_highlight_mat.no_depth_test = true
-	move_highlight_mat.render_priority = 15
+	move_highlight_mat.render_priority = 2
 	
 	# Подсветка атаки/взятия (тревожный красный маркер)
 	attack_highlight_mat = StandardMaterial3D.new()
@@ -121,8 +120,7 @@ func _init_materials() -> void:
 	attack_highlight_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	attack_highlight_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	attack_highlight_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	attack_highlight_mat.no_depth_test = true
-	attack_highlight_mat.render_priority = 15
+	attack_highlight_mat.render_priority = 2
 	
 	# Подсветка выбранной фигуры (золотой маркер)
 	select_highlight_mat = StandardMaterial3D.new()
@@ -133,8 +131,7 @@ func _init_materials() -> void:
 	select_highlight_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	select_highlight_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	select_highlight_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	select_highlight_mat.no_depth_test = true
-	select_highlight_mat.render_priority = 15
+	select_highlight_mat.render_priority = 2
 
 func _init_meshes() -> void:
 	meshes["pawn_white"] = preload("res://assets/obj/chess/pawn_white.obj")
