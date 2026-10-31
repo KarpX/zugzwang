@@ -10,7 +10,8 @@
 [ext_resource type="ArrayMesh" uid="uid://clps0b83mxnv6" path="res://assets/obj/bulb.obj" id="6_bulb"]
 [ext_resource type="Material" uid="uid://cordsocket01" path="res://assets/obj/bulb_cord_socket.tres" id="7_cordsocket"]
 [ext_resource type="Material" uid="uid://bulbglow001" path="res://assets/obj/bulb_glow.tres" id="8_bulbglow"]
-[ext_resource type="Script" path="res://scripts/hanging_lamp.gd" id="9_lamp_script"]
+[ext_resource type="Script" uid="uid://ga1xv3l03hki" path="res://scripts/hanging_lamp.gd" id="9_lamp_script"]
+[ext_resource type="Material" uid="uid://tablemat001" path="res://assets/obj/table_material.tres" id="10_tablemat"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_x5vg1"]
 size = Vector3(40.07849, 13.515747, 0.60009766)
@@ -136,7 +137,7 @@ is_swinging = true
 [node name="OmniLight3D" type="OmniLight3D" parent="HangingBulb" unique_id=1332429521]
 transform = Transform3D(4, 0, 0, 0, 4, 0, 0, 0, 4, 0, -14.1, 0)
 light_color = Color(1, 0.941176, 0.784314, 1)
-light_energy = 3.6
+light_energy = 0.741
 light_bake_mode = 1
 shadow_enabled = true
 shadow_bias = 0.05
@@ -147,6 +148,7 @@ omni_attenuation = 1.2
 
 [node name="Table" type="MeshInstance3D" parent="TableStatic" unique_id=1970914707]
 transform = Transform3D(0.8, 0, 0, 0, 0.8, 0, 0, 0, 0.8, 16, 0, 20)
+material_override = ExtResource("10_tablemat")
 mesh = ExtResource("4_14vil")
 
 [node name="ChessBoard" parent="TableStatic/Table" unique_id=21915507 groups=["chess_board"] instance=ExtResource("5_board")]

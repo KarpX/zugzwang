@@ -3,20 +3,19 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dhf5cjr7wjkwj"
-path.s3tc="res://.godot/imported/floor.png-bd9139b7473b7f87b8ec1f36709851f6.s3tc.ctex"
+path="res://.godot/imported/floor.png-bd9139b7473b7f87b8ec1f36709851f6.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
-"vram_texture": true
+"vram_texture": false
 }
 
 [deps]
 
 source_file="res://assets/obj/floor.png"
-dest_files=["res://.godot/imported/floor.png-bd9139b7473b7f87b8ec1f36709851f6.s3tc.ctex"]
+dest_files=["res://.godot/imported/floor.png-bd9139b7473b7f87b8ec1f36709851f6.ctex"]
 
 [params]
 
-compress/mode=2
+compress/mode=0
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -24,7 +23,7 @@ compress/rdo_quality_loss=0.0
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0
-mipmaps/generate=true
+mipmaps/generate=false
 mipmaps/limit=-1
 roughness/mode=0
 roughness/src_normal=""
