@@ -9,7 +9,11 @@
 [ext_resource type="AudioStream" uid="uid://cgaxltonkbg6" path="res://assets/sounds/steps.ogg" id="4_jn645"]
 [ext_resource type="ArrayMesh" uid="uid://dbwqa6tjxla4m" path="res://assets/obj/camera.obj" id="4_ybpoa"]
 [ext_resource type="PackedScene" uid="uid://vbbrscmec1l0" path="res://scenes/chess/chess_board.tscn" id="5_board"]
+[ext_resource type="ArrayMesh" uid="uid://clps0b83mxnv6" path="res://assets/obj/bulb.obj" id="6_bulb"]
 [ext_resource type="Script" uid="uid://d0s352782ryie" path="res://scripts/world/security_camera.gd" id="6_seccam"]
+[ext_resource type="Material" uid="uid://cordsocket01" path="res://assets/obj/bulb_cord_socket.tres" id="7_cordsocket"]
+[ext_resource type="Material" uid="uid://bulbglow001" path="res://assets/obj/bulb_glow.tres" id="8_bulbglow"]
+[ext_resource type="Script" uid="uid://ga1xv3l03hki" path="res://scripts/hanging_lamp.gd" id="9_lamp_script"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_x5vg1"]
 size = Vector3(40.07849, 13.515747, 0.60009766)
@@ -52,16 +56,6 @@ volumetric_fog_albedo = Color(0.78431374, 0.78431374, 0.74509805, 1)
 volumetric_fog_anisotropy = 0.3
 adjustment_enabled = true
 adjustment_saturation = 0.9
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_x5vg1"]
-emission_enabled = true
-emission = Color(0.50634915, 0.43282357, 0.19715767, 1)
-emission_energy_multiplier = 3.0
-
-[sub_resource type="SphereMesh" id="SphereMesh_m4ky1"]
-material = SubResource("StandardMaterial3D_x5vg1")
-radius = 0.15
-height = 0.3
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_5vh7c"]
 size = Vector3(4.996704, 5.402466, 4.8352737)
@@ -155,7 +149,7 @@ transform = Transform3D(5, 0, 0, 0, 1, 0, 0, 0, 6.5, 16, 0, 20)
 mesh = ExtResource("2_85yof")
 
 [node name="player" type="CharacterBody3D" parent="." unique_id=570902455 groups=["player"]]
-transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 14.947643, 5.1845746, 3.7221327)
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 16, 5.185, 3.5)
 script = ExtResource("3_85yof")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="player" unique_id=1069967162]
@@ -175,23 +169,28 @@ stream = ExtResource("4_jn645")
 unit_size = 5.0
 max_db = 1.0
 max_distance = 12.0
-bus = &"Sound"
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1804770691]
 environment = SubResource("Environment_m4ky1")
 
-[node name="OmniLight3D" type="OmniLight3D" parent="." unique_id=1332429521]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.072947, 10.394057, 20.411669)
-light_color = Color(0.93666875, 1, 0.6907517, 1)
-light_energy = 1.796
+[node name="HangingBulb" type="MeshInstance3D" parent="." unique_id=1404448631]
+transform = Transform3D(0.25, 0, 0, 0, 0.25, 0, 0, 0, 0.25, 16, 12.503, 20)
+cast_shadow = 0
+mesh = ExtResource("6_bulb")
+surface_material_override/0 = ExtResource("7_cordsocket")
+surface_material_override/1 = ExtResource("8_bulbglow")
+script = ExtResource("9_lamp_script")
+is_swinging = true
+
+[node name="OmniLight3D" type="OmniLight3D" parent="HangingBulb" unique_id=1332429521]
+transform = Transform3D(4, 0, 0, 0, 4, 0, 0, 0, 4, 0, -14.1, 0)
+light_color = Color(1, 0.9411765, 0.6627451, 1)
+light_energy = 0.785
 light_bake_mode = 1
 shadow_enabled = true
-omni_range = 15.455645
-omni_attenuation = 1.5
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="OmniLight3D" unique_id=1404448631]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.0117788315, 0)
-mesh = SubResource("SphereMesh_m4ky1")
+shadow_bias = 0.05
+omni_range = 12.728249
+omni_attenuation = 1.2
 
 [node name="TableStatic" type="StaticBody3D" parent="." unique_id=1486369480]
 
