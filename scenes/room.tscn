@@ -20,6 +20,8 @@
 [ext_resource type="Material" uid="uid://cammaterial01" path="res://assets/obj/camera_material.tres" id="12_cammat"]
 [ext_resource type="AudioStream" uid="uid://d35f8fhkj4urh" path="res://assets/sounds/bulb_ambient.ogg" id="15_katsu"]
 [ext_resource type="Script" uid="uid://bfjdrebj064ye" path="res://scripts/world/door_knock_timer.gd" id="16_door"]
+[ext_resource type="ArrayMesh" uid="uid://cjcw86qhrw4vp" path="res://assets/obj/radio.obj" id="17_radio_mesh"]
+[ext_resource type="Material" uid="uid://radiomat001" path="res://assets/obj/radio_material.tres" id="18_radio_mat"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_x5vg1"]
 size = Vector3(40.07849, 13.515747, 0.60009766)
@@ -161,7 +163,6 @@ stream = ExtResource("8_jxwrd")
 volume_db = -25.0
 unit_size = 24.0
 max_distance = 80.0
-bus = &"Ambient"
 
 [node name="floor2" type="MeshInstance3D" parent="." unique_id=96282830]
 transform = Transform3D(5, 0, 0, 0, 1, 0, 0, 0, 6.5, 16, 12.502992, 20)
@@ -230,7 +231,6 @@ unit_size = 3.0
 max_db = 1.0
 autoplay = true
 max_distance = 25.0
-bus = &"Ambient"
 
 [node name="TableStatic" type="StaticBody3D" parent="." unique_id=1486369480]
 
@@ -242,6 +242,18 @@ mesh = ExtResource("4_14vil")
 [node name="ChessBoard" parent="TableStatic/Table" unique_id=21915507 groups=["chess_board"] instance=ExtResource("5_board")]
 transform = Transform3D(-0.7, 0, -6.119594e-08, 0, 0.7, 0, 6.119594e-08, 0, -0.7, -1.8477612, 5.6046634, -1.7485161)
 black_move_duration = 1.2
+
+[node name="Radio" type="MeshInstance3D" parent="TableStatic/Table" unique_id=2089456123]
+transform = Transform3D(-0.21455763, 0, -0.2765232, 0, 0.35, 0, 0.2765232, 0, -0.21455763, 2.5768547, 5.6046634, 0.31890488)
+material_override = ExtResource("18_radio_mat")
+mesh = ExtResource("17_radio_mesh")
+
+[node name="DialGlow" type="OmniLight3D" parent="TableStatic/Table/Radio" unique_id=2089456124]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.7, 1, 0.65)
+light_color = Color(1, 0.82, 0.3, 1)
+light_energy = 0.8
+omni_range = 1.2
+omni_attenuation = 1.8
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="TableStatic" unique_id=1298941691]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.009525, 2.201233, 20.009485)

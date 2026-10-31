@@ -1,0 +1,13 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://radiomat001"]
+
+[ext_resource type="Texture2D" uid="uid://bvihxlj6g1q60" path="res://assets/obj/radio.png" id="1_tex"]
+
+[resource]
+resource_name = "radio_material"
+transparency = 0
+cull_mode = 0
+diffuse_mode = 2
+albedo_texture = ExtResource("1_tex")
+metallic_specular = 0.25
+roughness = 0.68
+texture_filter = 0
