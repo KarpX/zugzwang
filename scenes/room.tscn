@@ -3,13 +3,27 @@
 [ext_resource type="ArrayMesh" uid="uid://vby8rcdeokm4" path="res://assets/obj/wall.obj" id="1_ffxv4"]
 [ext_resource type="ArrayMesh" uid="uid://dvckkxtjwhf5y" path="res://assets/obj/floor.obj" id="2_85yof"]
 [ext_resource type="ArrayMesh" uid="uid://bu2hmu1ispov0" path="res://assets/obj/door.obj" id="2_qvc4m"]
+[ext_resource type="ArrayMesh" uid="uid://bhdtqjfkdulmd" path="res://assets/obj/camera_base.obj" id="3_7dqbv"]
 [ext_resource type="Script" uid="uid://civp1exok25hc" path="res://scenes/player.gd" id="3_85yof"]
 [ext_resource type="ArrayMesh" uid="uid://bx4h6i2qwxn85" path="res://assets/obj/table.obj" id="4_14vil"]
 [ext_resource type="AudioStream" uid="uid://cgaxltonkbg6" path="res://assets/sounds/steps.ogg" id="4_jn645"]
+[ext_resource type="ArrayMesh" uid="uid://dbwqa6tjxla4m" path="res://assets/obj/camera.obj" id="4_ybpoa"]
 [ext_resource type="PackedScene" uid="uid://vbbrscmec1l0" path="res://scenes/chess/chess_board.tscn" id="5_board"]
+[ext_resource type="Script" uid="uid://d0s352782ryie" path="res://scripts/world/security_camera.gd" id="6_seccam"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_x5vg1"]
 size = Vector3(40.07849, 13.515747, 0.60009766)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_lens_glow"]
+albedo_color = Color(0.9, 0.05, 0.05, 1)
+emission_enabled = true
+emission = Color(1, 0.05, 0.05, 1)
+emission_energy_multiplier = 4.0
+
+[sub_resource type="SphereMesh" id="SphereMesh_lens"]
+material = SubResource("StandardMaterial3D_lens_glow")
+radius = 0.07
+height = 0.14
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_m4ky1"]
 size = Vector3(6.4505615, 0.6176758, 6.2828064)
@@ -28,8 +42,9 @@ tonemap_exposure = 1.1
 ssao_enabled = true
 ssao_radius = 1.5
 glow_enabled = true
+glow_intensity = 1.45
 glow_strength = 1.15
-glow_bloom = 0.15
+glow_bloom = 0.2
 glow_blend_mode = 2
 volumetric_fog_enabled = true
 volumetric_fog_density = 0.01
@@ -91,6 +106,40 @@ shape = SubResource("BoxShape3D_x5vg1")
 transform = Transform3D(0.8, 0, 0, 0, 0.8, 0, 0, 0, 0.8, 16, 0, 0)
 mesh = ExtResource("2_qvc4m")
 
+[node name="CameraBase" type="MeshInstance3D" parent="walls" unique_id=1965094053]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.332, 9.019, 2.05)
+mesh = ExtResource("3_7dqbv")
+
+[node name="CameraPivot" type="Node3D" parent="walls/CameraBase" unique_id=1142422552]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0.5)
+script = ExtResource("6_seccam")
+
+[node name="CameraMesh" type="MeshInstance3D" parent="walls/CameraBase/CameraPivot" unique_id=1142422556]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 0.2, -0.4, -1.2)
+mesh = ExtResource("4_ybpoa")
+
+[node name="NightVisionSpotLight" type="SpotLight3D" parent="walls/CameraBase/CameraPivot" unique_id=1142422553]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -2.4)
+light_color = Color(1, 0.1, 0.1, 1)
+light_energy = 1.6
+light_volumetric_fog_energy = 3.0
+shadow_enabled = true
+distance_fade_enabled = true
+spot_range = 28.0
+spot_angle = 14.0
+spot_angle_attenuation = 1.8
+
+[node name="LensGlow" type="OmniLight3D" parent="walls/CameraBase/CameraPivot" unique_id=1142422554]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -2.35)
+light_color = Color(1, 0.05, 0.05, 1)
+light_energy = 0.8
+omni_range = 0.6
+omni_attenuation = 2.5
+
+[node name="LensMesh" type="MeshInstance3D" parent="walls/CameraBase/CameraPivot" unique_id=1142422555]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -2.2467504)
+mesh = SubResource("SphereMesh_lens")
+
 [node name="floor2" type="MeshInstance3D" parent="." unique_id=96282830]
 transform = Transform3D(5, 0, 0, 0, 1, 0, 0, 0, 6.5, 16, 12.502992, 20)
 mesh = ExtResource("2_85yof")
@@ -105,7 +154,7 @@ shape = SubResource("BoxShape3D_m4ky1")
 transform = Transform3D(5, 0, 0, 0, 1, 0, 0, 0, 6.5, 16, 0, 20)
 mesh = ExtResource("2_85yof")
 
-[node name="player" type="CharacterBody3D" parent="." unique_id=570902455]
+[node name="player" type="CharacterBody3D" parent="." unique_id=570902455 groups=["player"]]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 14.947643, 5.1845746, 3.7221327)
 script = ExtResource("3_85yof")
 
