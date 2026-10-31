@@ -21,6 +21,8 @@ var _is_selected: bool = false
 func _ready() -> void:
 	if position.y != 0.0:
 		base_y = position.y
+	if mesh_instance == null:
+		mesh_instance = get_node_or_null("MeshInstance3D")
 
 ## Инициализация фигуры и выравнивание основания меша по нулевой плоскости
 func setup(type: String, white: bool, pos: Vector2i, piece_mesh: Mesh, piece_mat: Material, surface_height: float = 0.405) -> void:

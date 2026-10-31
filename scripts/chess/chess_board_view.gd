@@ -100,12 +100,26 @@ func _init_materials() -> void:
 	select_highlight_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 
 func _init_meshes() -> void:
-	meshes["pawn"] = preload("res://assets/obj/chess/pawn.obj")
-	meshes["rook"] = preload("res://assets/obj/chess/rook.obj")
-	meshes["knight"] = preload("res://assets/obj/chess/knight.obj")
-	meshes["bishop"] = preload("res://assets/obj/chess/bishop.obj")
-	meshes["queen"] = preload("res://assets/obj/chess/queen.obj")
-	meshes["king"] = preload("res://assets/obj/chess/king.obj")
+	meshes["pawn_white"] = preload("res://assets/obj/chess/pawn_white.obj")
+	meshes["rook_white"] = preload("res://assets/obj/chess/rook_white.obj")
+	meshes["knight_white"] = preload("res://assets/obj/chess/knight_white.obj")
+	meshes["bishop_white"] = preload("res://assets/obj/chess/bishop_white.obj")
+	meshes["queen_white"] = preload("res://assets/obj/chess/queen_white.obj")
+	meshes["king_white"] = preload("res://assets/obj/chess/king_white.obj")
+	
+	meshes["pawn_black"] = preload("res://assets/obj/chess/pawn_black.obj")
+	meshes["rook_black"] = preload("res://assets/obj/chess/rook_black.obj")
+	meshes["knight_black"] = preload("res://assets/obj/chess/knight_black.obj")
+	meshes["bishop_black"] = preload("res://assets/obj/chess/bishop_black.obj")
+	meshes["queen_black"] = preload("res://assets/obj/chess/queen_black.obj")
+	meshes["king_black"] = preload("res://assets/obj/chess/king_black.obj")
+	
+	meshes["pawn"] = meshes["pawn_white"]
+	meshes["rook"] = meshes["rook_white"]
+	meshes["knight"] = meshes["knight_white"]
+	meshes["bishop"] = meshes["bishop_white"]
+	meshes["queen"] = meshes["queen_white"]
+	meshes["king"] = meshes["king_white"]
 
 ## Преобразование координат клетки доски (file 0..7, rank 0..7) в локальные 3D-координаты
 func cell_to_local_pos(cell: Vector2i) -> Vector3:
@@ -121,16 +135,29 @@ func local_pos_to_cell(pos: Vector3) -> Vector2i:
 		return Vector2i(file, rank)
 	return Vector2i(-1, -1)
 
-## Спавн всех 32 фигур в соответствии с логикой
+## Спавн или подключение существующих 32 фигур со сцены
 func spawn_pieces() -> void:
 	if pieces_container == null:
 		pieces_container = get_node_or_null("Pieces")
 	if pieces_container == null:
 		return
-	# Очистка старых фигур
-	for child in pieces_container.get_children():
-		child.queue_free()
+	
 	piece_nodes.clear()
+	
+	# Проверяем, есть ли уже запеченные в сцене 32 фигуры
+	var existing_pieces: Array[Node] = pieces_container.get_children()
+	if existing_pieces.size() >= 32:
+		for child in existing_pieces:
+			if child is ChessPiece3D:
+				piece_nodes[child.board_pos] = child
+				child.base_y = surface_y
+				if child.mesh_instance == null:
+					child.mesh_instance = child.get_node_or_null("MeshInstance3D")
+		return
+	
+	# Резервный динамический спавн, если сцена оказалась пустой
+	for child in existing_pieces:
+		child.queue_free()
 	
 	for x in range(8):
 		for y in range(8):
@@ -141,7 +168,8 @@ func spawn_pieces() -> void:
 
 func _spawn_piece_at(pos: Vector2i, p_type: String, is_white: bool) -> ChessPiece3D:
 	var piece_node = ChessPiece3DScript.new()
-	var mesh: Mesh = meshes.get(p_type, meshes["pawn"])
+	var key: String = p_type + ("_white" if is_white else "_black")
+	var mesh: Mesh = meshes.get(key, meshes.get(p_type, meshes["pawn"]))
 	var mat: Material = white_mat if is_white else black_mat
 	piece_node.setup(p_type, is_white, pos, mesh, mat, surface_y)
 	

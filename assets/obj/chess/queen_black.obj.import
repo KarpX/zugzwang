@@ -1,0 +1,25 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://byx0lh6i56o70"
+path="res://.godot/imported/queen_black.obj-93f01b933270d4fd86ea7d0ae5e5afd9.mesh"
+
+[deps]
+
+files=["res://.godot/imported/queen_black.obj-93f01b933270d4fd86ea7d0ae5e5afd9.mesh"]
+
+source_file="res://assets/obj/chess/queen_black.obj"
+dest_files=["res://.godot/imported/queen_black.obj-93f01b933270d4fd86ea7d0ae5e5afd9.mesh", "res://.godot/imported/queen_black.obj-93f01b933270d4fd86ea7d0ae5e5afd9.mesh"]
+
+[params]
+
+generate_tangents=true
+generate_lods=true
+generate_shadow_mesh=true
+generate_lightmap_uv2=false
+generate_lightmap_uv2_texel_size=0.2
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+force_disable_mesh_compression=false
