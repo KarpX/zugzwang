@@ -1,0 +1,45 @@
+spec_version: "0.1.0"
+name: "zugzwang-white-king"
+version: "1.0.0"
+description: "ECC-compliant agentic engineering configuration for 72-hour Godot 4 game jam project 'Белый Король' (White King)."
+engine: "Godot 4.7 Forward+"
+jam_format: "72-hour Game Jam"
+team_size: 3
+architecture: "Signal Bus (EventBus Autoload)"
+
+agents:
+  - name: "jam-architect"
+    role: "Lead Architect, EventBus Coordinator & Build Verifier"
+    file: "agents/jam-architect.md"
+  - name: "dev1-chess-ai"
+    role: "Chess Engine, Board Logic & Minimax AI Specialist"
+    file: "agents/dev1-chess-ai.md"
+  - name: "dev2-bunker-world"
+    role: "3D Bunker Environment, Player Controller & Destruction Specialist"
+    file: "agents/dev2-bunker-world.md"
+  - name: "dev3-audio-juice-ui"
+    role: "Audio Director, Shaders, VFX/Juice & UI Specialist"
+    file: "agents/dev3-audio-juice-ui.md"
+  - name: "godot-code-reviewer"
+    role: "GDScript Static Analysis & Git Conflict Guard"
+    file: "agents/godot-code-reviewer.md"
+
+rules:
+  - "rules/signal-bus-architecture.md"
+  - "rules/zero-git-conflicts.md"
+  - "rules/godot4-gdscript.md"
+  - "rules/gamejam-72h-lifecycle.md"
+
+mcp_tools:
+  server: "godot"
+  live_port: 6505
+  capabilities:
+    - scene_tree_dump
+    - read_scene
+    - validate_script
+    - get_console_log
+    - get_errors
+    - setup_autoload
+    - run_scene
+    - stop_scene
+

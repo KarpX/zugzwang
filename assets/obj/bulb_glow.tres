@@ -1,0 +1,13 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://bulbglow001"]
+
+[ext_resource type="Texture2D" uid="uid://bm2uxqtr4ndse" path="res://assets/obj/bulb.png" id="1_tex"]
+
+[resource]
+resource_name = "bulb_glow"
+albedo_color = Color(1, 0.968627, 0.862745, 1)
+albedo_texture = ExtResource("1_tex")
+roughness = 0.15
+emission_enabled = true
+emission = Color(1, 0.941176, 0.764706, 1)
+emission_energy_multiplier = 4.0
+texture_filter = 0

@@ -1,0 +1,9 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://wallmat001"]
+
+[ext_resource type="Texture2D" uid="uid://c2kj6stxyk46v" path="res://assets/obj/wall.png" id="1_tex"]
+
+[resource]
+resource_name = "wall_material"
+albedo_texture = ExtResource("1_tex")
+roughness = 0.7
+texture_filter = 0

@@ -1,0 +1,10 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://cordsocket01"]
+
+[ext_resource type="Texture2D" uid="uid://bm2uxqtr4ndse" path="res://assets/obj/bulb.png" id="1_tex"]
+
+[resource]
+resource_name = "cord_socket"
+albedo_texture = ExtResource("1_tex")
+metallic = 0.4
+roughness = 0.35
+texture_filter = 0

@@ -1,0 +1,39 @@
+---
+description: Godot 4 GDScript 2.0 coding guidelines and best practices
+globs: **/*.gd
+alwaysApply: true
+---
+
+# Godot 4 & GDScript 2.0 Coding Guidelines
+
+1. **Static Typing is Mandatory**:
+   - Every variable, parameter, and return value must have an explicit type.
+   - Example:
+     ```gdscript
+     var current_stage: int = 1
+     func calculate_legal_moves(board_pos: Vector2i) -> Array[Vector2i]:
+         var moves: Array[Vector2i] = []
+         return moves
+     ```
+
+2. **Signals & EventBus**:
+   - For internal node events, define local signals: `signal clicked`
+   - For global game events, connect to / emit from `EventBus`:
+     ```gdscript
+     EventBus.piece_captured.emit("pawn", true)
+     ```
+
+3. **Node Lifecycle & Safety**:
+   - Use `@onready` with explicit types: `@onready var camera: Camera3D = $Camera3D`
+   - Check validity when referencing dynamic nodes: `if is_instance_valid(target_node):`
+   - Clean up Tweens before creating new ones:
+     ```gdscript
+     if active_tween and active_tween.is_valid():
+         active_tween.kill()
+     active_tween = create_tween().set_trans(Tween.TRANS_QUAD)
+     ```
+
+4. **Input Handling**:
+   - UI / gameplay clicks in `_unhandled_input(event: InputEvent)`
+   - Movement vectors via `Input.get_vector("Left", "Right", "Forward", "Back")`
+
