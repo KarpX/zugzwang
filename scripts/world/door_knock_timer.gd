@@ -38,6 +38,13 @@ func _ready() -> void:
 	
 	var bus = _get_event_bus()
 	if bus:
+		if bus.is_intro_active:
+			is_active = false
+		if bus.has_signal("intro_sequence_finished"):
+			bus.intro_sequence_finished.connect(func():
+				is_active = true
+				idle_time = 0.0
+			)
 		if bus.has_signal("piece_moved"):
 			bus.piece_moved.connect(_on_piece_moved)
 		if bus.has_signal("game_over"):

@@ -53,6 +53,10 @@ signal lamp_flicker_triggered(sound_index: int, duration: float)
 ## Завершение анимации перебоя со светом (свет полностью восстановлен)
 signal lamp_trouble_finished()
 
+## Сигналы вступительного дисклеймера и брифинга
+signal intro_sequence_started()
+signal intro_sequence_finished()
+
 ## Сигналы финала и концовок
 signal ending_sequence_started(ending_type: String)
 signal white_victory_door_opened()
@@ -124,6 +128,7 @@ var outside_stage: int = 0
 var is_in_board_mode: bool = false
 var is_game_finished: bool = false
 var is_lamp_trouble_active: bool = false
+var is_intro_active: bool = false
 
 # Persistent state across scene reloads
 var restart_quote: String = ""

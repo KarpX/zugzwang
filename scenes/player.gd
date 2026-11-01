@@ -144,6 +144,12 @@ func _ready() -> void:
 	
 	var bus = _get_event_bus()
 	if bus:
+		if bus.is_intro_active:
+			can_move = false
+			can_walk = false
+			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		if bus.has_signal("intro_sequence_finished"):
+			bus.intro_sequence_finished.connect(_on_intro_finished)
 		if bus.has_signal("piece_captured"):
 			bus.piece_captured.connect(_on_piece_captured)
 		if bus.has_signal("door_knock_triggered"):
@@ -370,6 +376,12 @@ func _start_subtitle_animation(text_line: String, anim_duration: float) -> void:
 	
 	# 4. Плавное затухание текста
 	_radio_tween.tween_property(_radio_subtitle_label, "modulate:a", 0.0, 0.60)
+
+func _on_intro_finished() -> void:
+	if not is_board_mode:
+		can_move = true
+		can_walk = true
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 ## Обработчик взятия фигуры (сотрясение комнаты и радио-сводка потерь)
 func _on_piece_captured(piece_type: String, is_white: bool) -> void:

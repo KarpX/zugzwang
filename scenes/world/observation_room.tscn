@@ -173,6 +173,7 @@ text = "> ТЕРМИНАЛ СВЯЗИ УЗЛА «ZUGZWANG-0»
 > ВХОД ВЫПОЛНЕН: ОБЪЕКТ-0
 
 > ДЛЯ ПРОДОЛЖЕНИЯ НАЖМИТЕ [ E ] _"
+scroll_active = false
 scroll_following = true
 
 [node name="AudioStreamPlayer3D" type="AudioStreamPlayer3D" parent="CRTMonitor" unique_id=1158333965]
