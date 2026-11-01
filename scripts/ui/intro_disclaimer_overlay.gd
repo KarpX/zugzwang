@@ -180,7 +180,7 @@ func _show_stage(stage: Stage) -> void:
 			_category_label.add_theme_color_override("font_color", Color(0.85, 0.38, 0.38, 1.0))
 			_category_label.add_theme_color_override("font_shadow_color", Color(0.2, 0.05, 0.05, 0.9))
 			_divider.color = Color(0.65, 0.22, 0.22, 0.75)
-			_body_label.text = "Все действия выдуманы и не связаны с реальностью.\nЛюбые совпадения случайны."
+			_body_label.text = "Данная игра является художественным произведением. Все персонажи, организации и события вымышлены. Любые совпадения с реальными людьми (живыми или умершими), местами или событиями носят исключительно случайный характер."
 			_hint_label.text = "[ Пробел / ЛКМ / Enter — продолжить ]"
 
 		Stage.BRIEFING:
@@ -188,7 +188,7 @@ func _show_stage(stage: Stage) -> void:
 			_category_label.add_theme_color_override("font_color", Color(0.92, 0.82, 0.45, 1.0))
 			_category_label.add_theme_color_override("font_shadow_color", Color(0.2, 0.15, 0.05, 0.9))
 			_divider.color = Color(0.75, 0.62, 0.25, 0.75)
-			_body_label.text = "Вы – генерал-майор подразделения N.\nВам необходимо выиграть сражение."
+			_body_label.text = "Вы – генерал-майор подразделения N.\nВаша задача – одержать победу в сражении."
 			_hint_label.text = "[ Пробел / ЛКМ / Enter — заступить на пост ]"
 
 	_play_sfx()

@@ -33,23 +33,54 @@ extends Node3D
 var _sound_timer: float = 0.0
 var _twitch_quat: Quaternion = Quaternion.IDENTITY
 var _twitch_tween: Tween = null
+var _sound_fade_tween: Tween = null
 var _not_follow = false
+var _is_fading_sound: bool = false
+var _initial_sound_vol: float = -25.0
 
 func toggle_follow(value = null) -> void:
 	if value != null:
 		_not_follow = bool(value)
 	else:
 		_not_follow = not _not_follow
-	if _not_follow:
+	if _not_follow and not _is_fading_sound:
 		stop_camera_sound()
 
-## Принудительная остановка звука движения камеры и сброс таймера
-func stop_camera_sound() -> void:
+## Остановка звука движения камеры с поддержкой плавного затухания
+func stop_camera_sound(fade_time: float = 0.0) -> void:
 	_sound_timer = 0.0
-	if camera_sound and is_instance_valid(camera_sound):
+
+	if camera_sound == null or not is_instance_valid(camera_sound):
+		_is_fading_sound = false
+		return
+	if not camera_sound.playing:
+		_is_fading_sound = false
+		return
+
+	if fade_time <= 0.0:
+		if _sound_fade_tween and _sound_fade_tween.is_valid():
+			_sound_fade_tween.kill()
+		_is_fading_sound = false
 		camera_sound.stop()
-	if _twitch_tween and _twitch_tween.is_valid():
-		_twitch_tween.kill()
+		camera_sound.volume_db = _initial_sound_vol
+	else:
+		if _is_fading_sound and _sound_fade_tween and _sound_fade_tween.is_valid():
+			return
+		if _sound_fade_tween and _sound_fade_tween.is_valid():
+			_sound_fade_tween.kill()
+		_is_fading_sound = true
+		_sound_fade_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		_sound_fade_tween.tween_property(camera_sound, "volume_db", -40.0, fade_time)
+		_sound_fade_tween.tween_callback(func():
+			if camera_sound and is_instance_valid(camera_sound):
+				camera_sound.stop()
+				camera_sound.volume_db = _initial_sound_vol
+			_is_fading_sound = false
+		)
+
+## Плавное затухание звука сервопривода камеры
+func fade_out_camera_sound(duration: float = 1.5) -> void:
+	stop_camera_sound(duration)
 
 func _get_event_bus() -> Node:
 	if not is_inside_tree():
@@ -59,6 +90,8 @@ func _get_event_bus() -> Node:
 func _ready() -> void:
 	if camera_sound == null:
 		camera_sound = get_node_or_null("CameraSound")
+	if camera_sound:
+		_initial_sound_vol = camera_sound.volume_db
 	if camera_sound and camera_sound.stream is AudioStreamOggVorbis:
 		(camera_sound.stream as AudioStreamOggVorbis).loop = true
 	if sync_fov_with_spotlight:
@@ -68,8 +101,20 @@ func _ready() -> void:
 	_resolve_target()
 	
 	var bus = _get_event_bus()
-	if bus and bus.has_signal("piece_captured"):
-		bus.piece_captured.connect(_on_piece_captured)
+	if bus:
+		if bus.has_signal("piece_captured"):
+			bus.piece_captured.connect(_on_piece_captured)
+		if bus.has_signal("white_victory_door_opened"):
+			bus.white_victory_door_opened.connect(_on_white_victory_door_opened)
+		if bus.has_signal("game_over"):
+			bus.game_over.connect(_on_game_over)
+
+func _on_white_victory_door_opened() -> void:
+	fade_out_camera_sound(1.5)
+
+func _on_game_over(winner: String) -> void:
+	if winner.to_lower() == "white":
+		fade_out_camera_sound(1.5)
 
 ## Нервный рывок сервопривода камеры при потерях фигур
 func twitch_camera(intensity: float = 0.35) -> void:
@@ -132,7 +177,8 @@ func _resolve_target() -> void:
 
 func _process(delta: float) -> void:
 	if not is_inside_tree() or _not_follow:
-		stop_camera_sound()
+		if not _is_fading_sound:
+			stop_camera_sound()
 		return
 
 	if not target or not is_instance_valid(target):
@@ -207,15 +253,29 @@ func _update_camera_sound(is_turning: bool, delta: float = 0.0) -> void:
 
 	if is_turning:
 		_sound_timer = sound_stop_delay
+		if _sound_fade_tween and _sound_fade_tween.is_valid():
+			_sound_fade_tween.kill()
+		_is_fading_sound = false
+		camera_sound.volume_db = _initial_sound_vol
 		if not camera_sound.playing:
 			camera_sound.play()
 	else:
-		if delta > 0.0 and _sound_timer > 0.0:
+		if not camera_sound.playing:
+			_is_fading_sound = false
+			_sound_timer = 0.0
+			return
+
+		if delta <= 0.0:
+			_sound_timer = 0.0
+			stop_camera_sound(0.0)
+			return
+
+		if _sound_timer > 0.0:
 			_sound_timer -= delta
 			if _sound_timer <= 0.0:
-				if camera_sound.playing:
-					camera_sound.stop()
+				stop_camera_sound(0.15)
 		else:
-			_sound_timer = 0.0
-			if camera_sound.playing:
-				camera_sound.stop()
+			if not _is_fading_sound:
+				stop_camera_sound(0.15)
+			elif _sound_fade_tween and _sound_fade_tween.is_valid():
+				_sound_fade_tween.custom_step(delta)

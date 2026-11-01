@@ -5,6 +5,8 @@ extends CharacterBody3D
 @export var sensitivity: float = 0.003
 @export var table_interact_distance: float = 4.2
 @export var table_world_center: Vector3 = Vector3(16.0, 0.0, 20.0)
+@export_range(1.0, 15.0, 0.5) var queen_panic_duration: float = 3.5
+@export_range(0.5, 4.0, 0.25) var panic_fade_out_time: float = 1.5
 
 @onready var head: Node3D = $head
 @onready var camera: Camera3D = $head/Camera3D
@@ -23,7 +25,10 @@ var is_board_mode: bool = false
 var can_move: bool = true       # Вращение камеры мышью
 var can_walk: bool = true       # Перемещение WASD
 var is_near_table: bool = false
+var is_defeat_locked: bool = false
 
+var _initial_transform: Transform3D = Transform3D.IDENTITY
+var _initial_head_rotation_x: float = 0.0
 var _cam_tween: Tween = null
 var _initial_cam_transform: Transform3D = Transform3D.IDENTITY
 var _radio_subtitle_label: Label = null
@@ -135,6 +140,9 @@ func _get_event_bus() -> Node:
 
 func _ready() -> void:
 	add_to_group("player")
+	_initial_transform = global_transform
+	if head != null:
+		_initial_head_rotation_x = head.rotation.x
 	if camera != null:
 		_initial_cam_transform = camera.transform
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
@@ -244,6 +252,9 @@ func _find_chess_board() -> void:
 	_chess_board_node = get_node_or_null("../TableStatic/Table/ChessBoard")
 
 func _unhandled_input(event: InputEvent) -> void:
+	if is_defeat_locked:
+		return
+
 	# 1. Вращение камеры от первого лица (только в свободном режиме ходьбы)
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		if can_move:
@@ -356,22 +367,37 @@ func _on_radio_transmission_started(text_line: String, _stream: AudioStream, dur
 func _start_subtitle_animation(text_line: String, anim_duration: float) -> void:
 	if _radio_subtitle_label == null:
 		return
+
+	var bus = _get_event_bus()
+	if _radio_tween and _radio_tween.is_valid():
+		_radio_tween.kill()
+		if bus:
+			bus.is_radio_text_visible = false
+
+	if bus:
+		bus.is_radio_text_visible = true
+
 	_radio_subtitle_label.text = text_line
 	_radio_subtitle_label.visible_ratio = 0.0
 	_radio_subtitle_label.modulate.a = 0.25
 	
-	if _radio_tween and _radio_tween.is_valid():
-		_radio_tween.kill()
-		
 	_radio_tween = create_tween().set_trans(Tween.TRANS_LINEAR)
 	# 1. Быстрое проявление подложки текста
 	_radio_tween.tween_property(_radio_subtitle_label, "modulate:a", 1.0, 0.10)
 	
-	# 2. Анимация печати текста — ровно пока идет эта печать, играет шум радио
+	# 2. Анимация печати текста — ровно пока идет эта печать, вырисовывается текст и блокируются ходы
 	_radio_tween.parallel().tween_property(_radio_subtitle_label, "visible_ratio", 1.0, anim_duration)
 	
-	# 3. Как только анимация печати прекращается — звук радио затихает в RadioController,
-	# а полностью напечатанный текст остаётся для чтения еще на 2.5 секунды
+	# Как только текст перестал вырисовываться — немедленно разрешаем делать ходы!
+	_radio_tween.tween_callback(func():
+		var b = _get_event_bus()
+		if b:
+			b.is_radio_text_visible = false
+			if b.has_signal("radio_transmission_finished"):
+				b.radio_transmission_finished.emit()
+	)
+	
+	# 3. Полностью напечатанный текст остаётся для чтения еще на 2.5 секунды (ходы уже разрешены)
 	_radio_tween.tween_interval(2.5)
 	
 	# 4. Плавное затухание текста
@@ -398,7 +424,7 @@ func _on_piece_captured(piece_type: String, is_white: bool) -> void:
 				# Катастрофа при потере Ферзя: мощнейшая тряска (максимальная травма, долгое затухание, смещение 15 см)
 				apply_camera_shake(1.0, 0.85, 0.15)
 				# Страшное событие: потеря королевы включает тяжелое дыхание и виньетку
-				start_heavy_breathing(12.0, 0.80)
+				start_heavy_breathing(queen_panic_duration, 0.80)
 			_:
 				apply_camera_shake(0.30, 2.8, 0.045)
 		show_radio_report(piece_key, true)
@@ -469,12 +495,26 @@ func _on_door_knock_triggered(knock_level: int) -> void:
 ## Реакция на исход партии (страшные события: поражение Белых)
 func _on_game_over(winner: String) -> void:
 	var win_key: String = winner.to_lower()
-	if win_key == "black" or win_key == "breach":
+	if win_key == "black" or win_key == "breach" or win_key == "draw":
+		is_defeat_locked = true
+		can_walk = false
+		can_move = false
 		# Проигрыш Белых (мат или выбитая дверь бункера) — паника, тяжелое дыхание и глубокая виньетка
 		start_heavy_breathing(-1.0, 0.85)
 
 func _on_game_reset(_playthrough: int) -> void:
+	if _radio_tween and _radio_tween.is_valid():
+		_radio_tween.kill()
+		_radio_tween = null
+	if _radio_subtitle_label != null:
+		_radio_subtitle_label.text = ""
+		_radio_subtitle_label.modulate.a = 0.0
+		_radio_subtitle_label.visible_ratio = 0.0
+	var bus = _get_event_bus()
+	if bus:
+		bus.is_radio_text_visible = false
 	stop_heavy_breathing(0.0)
+	reset_to_start()
 
 func _init_breath_player() -> void:
 	if breath_player == null:
@@ -491,20 +531,19 @@ func _init_breath_player() -> void:
 		breath_player.bus = &"Sound"
 
 ## Запуск тяжелого дыхания и виньетки при страшных событиях (потеря королевы, проигрыш белых)
-func start_heavy_breathing(duration: float = 12.0, target_opacity: float = 0.80) -> void:
+func start_heavy_breathing(duration: float = 3.5, target_opacity: float = 0.80) -> void:
 	is_heavy_breathing = true
 	_init_breath_player()
 	
 	# 1. Запуск звука дыхания в голове игрока
 	if breath_player:
+		if _breath_tween and _breath_tween.is_valid():
+			_breath_tween.kill()
 		if not breath_player.playing:
 			breath_player.volume_db = -18.0
 			breath_player.play()
-		else:
-			if _breath_tween and _breath_tween.is_valid():
-				_breath_tween.kill()
-			_breath_tween = create_tween()
-			_breath_tween.tween_property(breath_player, "volume_db", -1.0, 0.25)
+		_breath_tween = create_tween()
+		_breath_tween.tween_property(breath_player, "volume_db", -1.0, 0.25)
 			
 	# 2. Активация виньетки паники
 	if _vignette_material:
@@ -521,10 +560,11 @@ func start_heavy_breathing(duration: float = 12.0, target_opacity: float = 0.80)
 		)
 		if duration > 0.0:
 			_vignette_tween.tween_interval(duration)
-			_vignette_tween.tween_callback(func(): stop_heavy_breathing(0.25))
+			_vignette_tween.tween_callback(func(): stop_heavy_breathing(panic_fade_out_time))
 
 ## Остановка тяжелого дыхания и плавное исчезновение виньетки
-func stop_heavy_breathing(fade_time: float = 1.5) -> void:
+func stop_heavy_breathing(fade_time: float = -1.0) -> void:
+	var actual_fade: float = panic_fade_out_time if fade_time < 0.0 else fade_time
 	is_heavy_breathing = false
 	if _vignette_tween and _vignette_tween.is_valid():
 		_vignette_tween.kill()
@@ -532,20 +572,26 @@ func stop_heavy_breathing(fade_time: float = 1.5) -> void:
 	if _vignette_material:
 		var cur_op: float = float(_vignette_material.get_shader_parameter("vignette_opacity"))
 		if cur_op > 0.0:
-			_vignette_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-			_vignette_tween.tween_method(
-				func(val: float): _vignette_material.set_shader_parameter("vignette_opacity", val),
-				cur_op,
-				0.0,
-				fade_time
-			)
+			if actual_fade <= 0.0:
+				_vignette_material.set_shader_parameter("vignette_opacity", 0.0)
+			else:
+				_vignette_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+				_vignette_tween.tween_method(
+					func(val: float): _vignette_material.set_shader_parameter("vignette_opacity", val),
+					cur_op,
+					0.0,
+					actual_fade
+				)
 			
 	if breath_player and breath_player.playing:
 		if _breath_tween and _breath_tween.is_valid():
 			_breath_tween.kill()
-		_breath_tween = create_tween()
-		_breath_tween.tween_property(breath_player, "volume_db", -35.0, fade_time)
-		_breath_tween.tween_callback(breath_player.stop)
+		if actual_fade <= 0.0:
+			breath_player.stop()
+		else:
+			_breath_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+			_breath_tween.tween_property(breath_player, "volume_db", -40.0, actual_fade)
+			_breath_tween.tween_callback(breath_player.stop)
 
 func get_vignette_opacity() -> float:
 	if _vignette_material:
@@ -619,6 +665,8 @@ func _update_footsteps(input_dir: Vector2) -> void:
 
 ## Плавный переход камеры за шахматный стол с гарантированным нулевым креном (roll = 0.0)
 func enter_board_mode() -> void:
+	if is_defeat_locked:
+		return
 	if is_board_mode:
 		return
 	if head == null:
@@ -699,6 +747,8 @@ func enter_board_mode() -> void:
 
 ## Возврат камеры обратно к телу персонажа
 func exit_board_mode() -> void:
+	if is_defeat_locked:
+		return
 	if not is_board_mode:
 		return
 		
@@ -723,3 +773,46 @@ func exit_board_mode() -> void:
 		bus.player_made_action.emit()
 	elif _chess_board_node and _chess_board_node.has_method("_on_camera_mode_changed"):
 		_chess_board_node._on_camera_mode_changed(false)
+
+## Сброс игрока на стартовую точку бункера (координаты спавна, ориентация, камера)
+func reset_to_start() -> void:
+	if _cam_tween and _cam_tween.is_valid():
+		_cam_tween.kill()
+		_cam_tween = null
+		
+	if _initial_transform != Transform3D.IDENTITY:
+		global_transform = _initial_transform
+		
+	velocity = Vector3.ZERO
+	
+	if head != null:
+		head.rotation.x = _initial_head_rotation_x
+		head.rotation.y = 0.0
+		head.rotation.z = 0.0
+		
+	if camera != null:
+		camera.transform = _initial_cam_transform
+		camera.h_offset = 0.0
+		camera.v_offset = 0.0
+		
+	is_board_mode = false
+	is_near_table = false
+	
+	if is_defeat_locked:
+		can_walk = false
+		can_move = false
+	else:
+		can_walk = true
+		can_move = true
+		
+	if player_steps != null and player_steps.playing:
+		player_steps.stop()
+		
+	stop_heavy_breathing(0.0)
+
+## Разблокировка управления игроком после исчезновения экрана поражения
+func unlock_after_defeat() -> void:
+	is_defeat_locked = false
+	can_walk = true
+	can_move = true
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED

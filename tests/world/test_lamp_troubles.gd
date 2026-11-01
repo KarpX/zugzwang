@@ -80,7 +80,7 @@ func _run_tests() -> void:
 	assert(hanging_lamp._is_trouble_playing == false, "Взятие черной ладьи НЕ должно вызывать перебой в бункере")
 	print("[PASS] Тест 6: Потери врага (черные) не вызывают внутренних перебоев освещения")
 	
-	# 7. ТЕСТ: Противник НЕ может сделать ход, пока проигрывается анимация
+	# 7. ТЕСТ: Противник делает ход естественно во время анимации перебоя
 	var chess_board = room.find_child("ChessBoard", true)
 	assert(chess_board != null, "Узел ChessBoard должен существовать")
 	
@@ -93,13 +93,13 @@ func _run_tests() -> void:
 	chess_board.logic.is_white_turn = false
 	var initial_move_count: int = chess_board.logic.move_count
 	
-	# Пытаемся запустить ход ИИ черных во время анимации
+	# Запускаем ход ИИ черных во время анимации (свет мигает параллельно, ход не блокируется)
 	chess_board._execute_ai_turn()
 	
-	# Проверяем: ход НЕ был сделан! move_count не изменился, ход остался за черными
-	assert(chess_board.logic.move_count == initial_move_count, "Противник НЕ должен делать ход, пока играет анимация перебоя!")
-	assert(chess_board.logic.is_white_turn == false, "Ход не должен передаваться игроку, противник заблокирован")
-	print("[PASS] Тест 7: Ход противника успешно заблокирован на время анимации перебоя")
+	# Проверяем: ход ИИ успешно совершен, move_count увеличился, ход перешел к белым
+	assert(chess_board.logic.move_count > initial_move_count, "Противник должен совершать ход естественно, не блокируясь перебоем!")
+	assert(chess_board.logic.is_white_turn == true, "После хода ИИ черных ход переходит белому игроку")
+	print("[PASS] Тест 7: Ход противника естественно выполняется параллельно анимации перебоя")
 	
 	# 8. Завершаем перебой: проверяем разблокировку и передачу сигнала lamp_trouble_finished
 	hanging_lamp._on_trouble_finished()

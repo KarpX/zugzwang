@@ -26,7 +26,7 @@ const RADIO_SOUND_PATHS: Array[String] = [
 var _radio_stream: AudioStream = null
 var _sound_tween: Tween = null
 var _glow_tween: Tween = null
-var _base_glow_energy: float = 0.8
+var _base_glow_energy: float = 0.20
 
 func _ready() -> void:
 	_init_components()
@@ -52,7 +52,7 @@ func _init_components() -> void:
 	if dial_glow == null:
 		dial_glow = get_node_or_null("DialGlow") as OmniLight3D
 	if dial_glow:
-		_base_glow_energy = dial_glow.light_energy
+		dial_glow.light_energy = _base_glow_energy
 
 func _connect_event_bus() -> void:
 	var bus: Node = _get_event_bus()
@@ -105,6 +105,8 @@ func play_phrase(phrase_text: String, is_white: bool = true) -> float:
 	var bus: Node = _get_event_bus()
 
 	if is_silence:
+		if dial_glow:
+			dial_glow.light_energy = _base_glow_energy
 		stop_radio(true)
 		var silent_dur: float = 2.0
 		if bus and bus.has_signal("radio_transmission_started"):
@@ -148,7 +150,7 @@ func _start_glow_pulse(anim_duration: float) -> void:
 		_glow_tween.kill()
 
 	_glow_tween = create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	_glow_tween.tween_property(dial_glow, "light_energy", 1.5, fade_in_time)
+	_glow_tween.tween_property(dial_glow, "light_energy", 1.8, fade_in_time)
 	_glow_tween.tween_interval(anim_duration)
 	_glow_tween.tween_property(dial_glow, "light_energy", _base_glow_energy, fade_out_time)
 
@@ -159,7 +161,11 @@ func stop_radio(immediate: bool = false) -> void:
 	if _glow_tween and _glow_tween.is_valid():
 		_glow_tween.kill()
 	if dial_glow:
-		dial_glow.light_energy = _base_glow_energy
+		if immediate:
+			dial_glow.light_energy = _base_glow_energy
+		else:
+			_glow_tween = create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+			_glow_tween.tween_property(dial_glow, "light_energy", _base_glow_energy, fade_out_time)
 	if audio_player:
 		if immediate:
 			audio_player.stop()

@@ -17,7 +17,7 @@ var sound_knock1: AudioStream = preload("res://assets/sounds/knock1.ogg")
 var sound_knock2: AudioStream = preload("res://assets/sounds/knock2.ogg")
 var sound_knock3: AudioStream = preload("res://assets/sounds/knock3.ogg")
 
-var current_knock_level: int = 0 # 0: тишина, 1: knock1, 2: knock2, 3: knock3 (проигрыш)
+var current_knock_level: int = 0 # 0: тишина, 1: knock1, 2: knock2, 3: knock3 (случайный ход)
 var idle_time: float = 0.0
 var is_active: bool = true
 var is_game_finished: bool = false
@@ -101,11 +101,10 @@ func _trigger_next_knock() -> void:
 		3:
 			_play_knock_sound(sound_knock3)
 			_shake_door(0.18, 7)
-			is_active = false
-			is_game_finished = true
 			if bus:
 				bus.door_knock_triggered.emit(3)
-				bus.game_over.emit("breach")
+				bus.random_player_move_requested.emit()
+			reset_idle_timer()
 
 func _play_knock_sound(stream: AudioStream) -> void:
 	if knock_player == null:

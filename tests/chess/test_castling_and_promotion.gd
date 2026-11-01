@@ -297,7 +297,7 @@ func _test_ai_responds_after_promotion() -> void:
 	board.free()
 	print("[PASS] Тест 9: ИИ корректно отвечает ходом после превращения пешки в ферзя (без зависания)")
 
-## Тест 10: Блокировка ходов игрока, пока не завершился эффект
+## Тест 10: Проверка эффектов: перебой света НЕ блокирует ввод игрока, а перемещение фигуры блокирует
 func _test_player_blocked_while_effect_active() -> void:
 	var board_scene = load("res://scenes/chess/chess_board.tscn")
 	var board: ChessBoardView = board_scene.instantiate()
@@ -308,19 +308,24 @@ func _test_player_blocked_while_effect_active() -> void:
 	board.logic.is_white_turn = true
 	assert(board.is_effect_active() == false, "В спокойном состоянии эффектов нет")
 	
-	# 1. Активируем эффект перебоя со светом
+	# 1. Активируем перебой со светом: игрок НЕ должен блокироваться
 	board._is_light_trouble_active = true
-	assert(board.is_effect_active() == true, "Перебой со светом должен считаться активным эффектом")
-	
-	# Пытаемся кликнуть на пешку во время перебоя
+	assert(board.is_effect_active() == false, "Перебой со светом не должен блокировать ввод доски")
 	board._on_cell_clicked(Vector2i(0, 1))
-	assert(board.selected_pos == Vector2i(-1, -1), "Игрок НЕ может выбрать фигуру во время перебоя со светом")
+	assert(board.selected_pos == Vector2i(0, 1), "Игрок может выбирать фигуру во время перебоя со светом")
+	board.cancel_selection()
 	
-	# 2. Окончание перебоя
-	board._on_lamp_trouble_finished()
-	assert(board.is_effect_active() == false, "После окончания перебоя эффект снимается")
+	# 2. Активируем эффект перемещения фигуры белых (_is_white_moving): ввод блокируется
+	board._is_white_moving = true
+	assert(board.is_effect_active() == true, "Перемещение фигуры белых должно считаться активным блокирующим эффектом")
 	board._on_cell_clicked(Vector2i(0, 1))
-	assert(board.selected_pos == Vector2i(0, 1), "После окончания перебоя игрок снова может сделать ход")
+	assert(board.selected_pos == Vector2i(-1, -1), "Игрок НЕ может выбрать фигуру во время движения фигуры")
+	
+	# 3. Окончание движения фигуры
+	board._is_white_moving = false
+	assert(board.is_effect_active() == false, "После окончания движения эффект снимается")
+	board._on_cell_clicked(Vector2i(0, 1))
+	assert(board.selected_pos == Vector2i(0, 1), "После окончания движения игрок снова может сделать ход")
 	
 	board.free()
-	print("[PASS] Тест 10: Игрок заблокирован от совершения ходов, пока не завершился эффект")
+	print("[PASS] Тест 10: Перебой со светом не блокирует ввод игрока, а перемещение фигуры блокирует")

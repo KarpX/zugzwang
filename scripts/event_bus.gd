@@ -26,6 +26,9 @@ signal game_reset(playthrough: int)
 ## Вызывается при любом осознанном действии игрока (сброс таймера стука в дверь)
 signal player_made_action()
 
+## Запрос на выполнение случайного легального хода игрока (например, при 3-м стуке в дверь вместо поражения)
+signal random_player_move_requested()
+
 ## Изменение выбранной клетки на доске (для UI подсказок и звука клика)
 signal square_selected(board_pos: Vector2i)
 signal square_deselected()
@@ -129,6 +132,7 @@ var is_in_board_mode: bool = false
 var is_game_finished: bool = false
 var is_lamp_trouble_active: bool = false
 var is_intro_active: bool = false
+var is_radio_text_visible: bool = false
 
 # Persistent state across scene reloads
 var restart_quote: String = ""
@@ -230,6 +234,7 @@ func reset_game_state(playthrough: int = -1) -> void:
 	outside_stage = 0
 	is_game_finished = false
 	is_lamp_trouble_active = false
+	is_radio_text_visible = false
 	escalation_stage_changed.emit(1, 0)
 	outside_stage_changed.emit(0, 40)
 	game_reset.emit(current_playthrough)

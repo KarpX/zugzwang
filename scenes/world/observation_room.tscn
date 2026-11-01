@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" uid="uid://cxdlckkq165k8" path="res://scripts/world/observation_monitor.gd" id="1_monitor"]
 [ext_resource type="AudioStream" uid="uid://d35f8fhkj4urh" path="res://assets/sounds/bulb_ambient.ogg" id="2_ienag"]
-[ext_resource type="AudioStream" uid="uid://bl1ix3odo6k4e" path="res://assets/sounds/its end.ogg" id="2_v34ih"]
+[ext_resource type="AudioStream" uid="uid://bl1ix3odo6k4e" path="res://assets/sounds/its end(old).ogg" id="2_v34ih"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_floor"]
 albedo_color = Color(0.08, 0.08, 0.09, 1)
@@ -188,7 +188,7 @@ max_distance = 8.0
 bus = &"Ambient"
 
 [node name="EntryTrigger" type="Area3D" parent="." unique_id=458047154]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 2, -2.5)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 2, -2.1559563)
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="EntryTrigger" unique_id=1537122101]
 shape = SubResource("BoxShape3D_trigger")
