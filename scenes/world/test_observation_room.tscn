@@ -1,0 +1,30 @@
+[gd_scene load_steps=3 format=3 uid="uid://testobsroom03"]
+
+[ext_resource type="PackedScene" uid="uid://c6y78m5xa1a3k" path="res://scenes/world/observation_room.tscn" id="1_obs"]
+
+[sub_resource type="Environment" id="Environment_test3"]
+background_mode = 1
+background_color = Color(0.015, 0.015, 0.02, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.06, 0.06, 0.07, 1)
+ambient_light_energy = 0.4
+
+[node name="TestObservationRoom" type="Node3D"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_test3")
+
+[node name="ObservationRoom" parent="." instance=ExtResource("1_obs")]
+
+[node name="CameraFront" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.994522, 0.104528, 0, -0.104528, 0.994522, 16, 7.35, -5.2)
+current = true
+fov = 70.0
+
+[node name="CameraBehind" type="Camera3D" parent="."]
+transform = Transform3D(-0.996195, -0.0151344, 0.0858316, 0, 0.984808, 0.173648, -0.0871557, 0.172987, -0.98106, 16.2, 6.95, -9.6)
+fov = 65.0
+
+[node name="CameraSidePeek" type="Camera3D" parent="."]
+transform = Transform3D(0.573576, -0.139173, 0.807265, 0, 0.985496, 0.169694, -0.819152, -0.0973327, 0.565257, 14.2, 7.15, -7.8)
+fov = 68.0
