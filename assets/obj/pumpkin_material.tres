@@ -1,0 +1,15 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://pumpkinmat001"]
+
+[ext_resource type="Texture2D" uid="uid://c6pj048w1s5a" path="res://assets/obj/pumpkin.png" id="1_tex"]
+[ext_resource type="Texture2D" path="res://assets/obj/pumpkin_emission.png" id="2_em"]
+
+[resource]
+resource_name = "pumpkin_material"
+cull_mode = 0
+albedo_texture = ExtResource("1_tex")
+metallic_specular = 0.25
+roughness = 0.72
+emission_enabled = true
+emission_energy_multiplier = 0.8
+emission_texture = ExtResource("2_em")
+texture_filter = 0

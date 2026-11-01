@@ -3,6 +3,9 @@
 [ext_resource type="Script" uid="uid://cxdlckkq165k8" path="res://scripts/world/observation_monitor.gd" id="1_monitor"]
 [ext_resource type="AudioStream" uid="uid://d35f8fhkj4urh" path="res://assets/sounds/bulb_ambient.ogg" id="2_ienag"]
 [ext_resource type="AudioStream" uid="uid://bl1ix3odo6k4e" path="res://assets/sounds/its end.ogg" id="2_v34ih"]
+[ext_resource type="ArrayMesh" uid="uid://b03ivq1yo3trn" path="res://assets/obj/pumpkin.obj" id="4_pumpkin_mesh"]
+[ext_resource type="Material" uid="uid://ey77ayl01iyy" path="res://assets/obj/pumpkin_material.tres" id="5_pumpkin_mat"]
+[ext_resource type="Script" uid="uid://bqywgl4msv4wk" path="res://scripts/world/pumpkin_flicker.gd" id="6_pumpkin_flicker"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_floor"]
 albedo_color = Color(0.08, 0.08, 0.09, 1)
@@ -61,6 +64,9 @@ size = Vector3(3.5, 4, 1.5)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_blocker"]
 size = Vector3(4, 6, 0.6)
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_pumpkin"]
+radius = 0.24
 
 [node name="ObservationRoom" type="Node3D" unique_id=1759792024]
 
@@ -205,4 +211,23 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.000254, 9.098477, -5.49566
 stream = ExtResource("2_v34ih")
 volume_db = -10.0
 max_distance = 200.0
-bus = &"Music"
+
+[node name="PumpkinEasterEgg" type="StaticBody3D" parent="." unique_id=198471031]
+transform = Transform3D(-0.85, 0, -7.430936e-08, 0, 0.85, 0, 7.430936e-08, 0, -0.85, 16, 6.512, -8.62)
+
+[node name="PumpkinMesh" type="MeshInstance3D" parent="PumpkinEasterEgg" unique_id=198471032]
+material_override = ExtResource("5_pumpkin_mat")
+mesh = ExtResource("4_pumpkin_mesh")
+
+[node name="PumpkinCollision" type="CollisionShape3D" parent="PumpkinEasterEgg" unique_id=198471033]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.18, 0)
+shape = SubResource("SphereShape3D_pumpkin")
+
+[node name="PumpkinLight" type="OmniLight3D" parent="PumpkinEasterEgg" unique_id=198471034]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.16, 0.05)
+light_color = Color(1, 0.62, 0.15, 1)
+light_energy = 0.5
+shadow_enabled = true
+omni_range = 1.6
+omni_attenuation = 1.35
+script = ExtResource("6_pumpkin_flicker")
