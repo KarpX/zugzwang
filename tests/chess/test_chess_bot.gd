@@ -27,6 +27,7 @@ func _test_avoids_losing_exchange() -> void:
 	logic.grid[4][1] = null # e2
 	logic.grid[3][6] = null # d7
 	logic.grid[4][6] = null # e7
+	logic.grid[3][7] = null # d8 (черный ферзь вышел на d5)
 	
 	# Белые: пешка на d3 (3, 2) защищает пешку на e4 (4, 3)
 	logic.grid[3][2] = { "type": "pawn", "is_white": true, "has_moved": true }
