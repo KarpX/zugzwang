@@ -32,6 +32,7 @@
 [ext_resource type="Script" uid="uid://b7mumlrfsu7kw" path="res://scripts/ui/restart_quote_overlay.gd" id="24_quote_ui"]
 [ext_resource type="Script" uid="uid://d4kpa5hi5gkf2" path="res://scripts/world/radio_controller.gd" id="25_radio_script"]
 [ext_resource type="AudioStream" uid="uid://g0bxlekgr45d" path="res://assets/sounds/voices/radio_sound.ogg" id="26_7r6do"]
+[ext_resource type="Script" path="res://scripts/ui/intro_disclaimer_overlay.gd" id="27_intro_ui"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_wall_left"]
 size = Vector3(13.44, 13.5, 0.6)
@@ -503,3 +504,6 @@ script = ExtResource("22_ending")
 
 [node name="RestartQuoteOverlay" type="CanvasLayer" parent="." unique_id=1496681917]
 script = ExtResource("24_quote_ui")
+
+[node name="IntroDisclaimerOverlay" type="CanvasLayer" parent="."]
+script = ExtResource("27_intro_ui")
