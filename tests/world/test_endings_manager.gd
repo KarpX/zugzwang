@@ -18,6 +18,8 @@ func _init() -> void:
 	test_restart_quote_overlay()
 	test_mega_blood_puddle_and_abrupt_cut()
 	test_black_victory_defeat_screen_abrupt_and_scene_restoration()
+	test_camera_sound_stopped_and_premature_door_slam()
+	test_terminal_proximity_and_gaze()
 	print("--- [PASS] ВСЕ ТЕСТЫ КОНЦОВОК УСПЕШНО ПРОЙДЕНЫ! ---")
 	quit(0)
 
@@ -143,21 +145,82 @@ func test_white_victory_flow() -> void:
 	print("✓ Тест 4 пройден")
 
 func test_draw_ending_flow() -> void:
-	print("Тест 5: Логика пата (Стук, автоматная очередь)...")
+	print("Тест 5: Логика пата (Стук, автоматная очередь, резкий черный экран, восстановление сцены)...")
 	var root_node = get_root()
-	var manager = EndingManagerScript.new()
-	root_node.add_child(manager)
+	
+	# EventBus
+	var existing_bus = root_node.get_node_or_null("EventBus")
+	if existing_bus:
+		existing_bus.free()
+	var bus_script = load("res://scripts/event_bus.gd")
+	var bus = bus_script.new()
+	bus.name = "EventBus"
+	bus.current_stage = 3
+	root_node.add_child(bus)
+	
+	# Игрок
+	var player = CharacterBody3D.new()
+	player.set_script(load("res://scenes/player.gd"))
+	var head = Node3D.new()
+	head.name = "head"
+	player.add_child(head)
+	var cam = Camera3D.new()
+	cam.name = "Camera3D"
+	head.add_child(cam)
+	root_node.add_child(player)
+	player.is_board_mode = true
+	player.can_walk = false
+	player.can_move = false
+	
+	# Доска
+	var board_scene = preload("res://scenes/chess/chess_board.tscn")
+	var board_view = board_scene.instantiate()
+	root_node.add_child(board_view)
+	board_view.restart_game(1)
 	
 	var door_pivot = Node3D.new()
 	door_pivot.name = "DoorPivot"
-	manager.door_pivot = door_pivot
 	root_node.add_child(door_pivot)
+	
+	var manager = EndingManagerScript.new()
+	manager.player_node = player
+	manager.chess_board_view = board_view
+	manager.door_pivot = door_pivot
+	root_node.add_child(manager)
 	
 	manager._play_draw_ending()
 	assert(manager._is_ending_active == true, "Флаг _is_ending_active должен быть true")
 	
+	# Проверяем резкий черный экран пата
+	manager._show_abrupt_draw_screen()
+	var defeat_screen: DefeatScreen = null
+	for child in manager.get_children():
+		if child is DefeatScreen:
+			defeat_screen = child
+			break
+			
+	assert(defeat_screen != null, "DefeatScreen должен быть создан при пате")
+	assert(defeat_screen.visible == true, "DefeatScreen должен быть виден")
+	assert(defeat_screen._container.modulate.a == 1.0, "DefeatScreen должен мгновенно появиться с modulate.a = 1.0 (резко)")
+	assert(defeat_screen._title_label.text == "П А Т", "Заголовок экрана при пате должен быть 'П А Т'")
+	assert(bus.DRAW_QUOTES.has(defeat_screen._quote_label.text), "Цитата должна быть одной из DRAW_QUOTES")
+	
+	# Проверяем восстановление сцены под черным экраном
+	assert(bus.current_stage == 1, "Стадия эскалации должна сброситься на 1")
+	assert(player.is_board_mode == false, "Игрок должен выйти из режима стола")
+	
+	# Завершаем показ экрана
+	defeat_screen._dismiss_screen()
+	manager._finalize_player_control_after_defeat()
+	assert(player.can_walk == true, "После пата и закрытия экрана игрок должен свободно ходить")
+	assert(player.can_move == true, "После пата и закрытия экрана игрок должен свободно вращать камеру")
+	assert(manager._is_ending_active == false, "Флаг концовки должен быть сброшен")
+	
 	door_pivot.queue_free()
 	manager.queue_free()
+	board_view.queue_free()
+	player.queue_free()
+	bus.queue_free()
 	print("✓ Тест 5 пройден")
 
 func test_restart_quote_overlay() -> void:
@@ -333,3 +396,92 @@ func test_black_victory_defeat_screen_abrupt_and_scene_restoration() -> void:
 	player.queue_free()
 	bus.queue_free()
 	print("✓ Тест 8 пройден")
+
+func test_camera_sound_stopped_and_premature_door_slam() -> void:
+	print("Тест 9: Исправление звука камеры при движении и прерывание анимации двери...")
+	var root_node = get_root()
+	var manager = EndingManagerScript.new()
+	root_node.add_child(manager)
+	
+	# 1. Проверяем остановку звука камеры наблюдения при открытии двери
+	var cam_script = load("res://scripts/world/security_camera.gd")
+	var cam_node = Node3D.new()
+	cam_node.set_script(cam_script)
+	var cam_audio = AudioStreamPlayer3D.new()
+	cam_audio.name = "CameraSound"
+	cam_node.add_child(cam_audio)
+	root_node.add_child(cam_node)
+	manager.security_camera = cam_node
+	
+	# Симулируем, что звук камеры играл во время движения игрока
+	cam_audio.stream = AudioStreamWAV.new()
+	cam_node._sound_timer = 0.25
+	
+	var door_pivot = Node3D.new()
+	door_pivot.name = "DoorPivot"
+	manager.door_pivot = door_pivot
+	root_node.add_child(door_pivot)
+	
+	# Открываем дверь по белой победе
+	manager._play_white_victory()
+	assert(cam_node._not_follow == true, "Камера должна перестать следовать")
+	assert(cam_audio.playing == false, "Звук поворота камеры должен быть принудительно остановлен!")
+	assert(is_equal_approx(door_pivot.rotation_degrees.y, manager._initial_door_rot.y - 88.0), "Дверь должна открыться")
+	
+	# 2. Игрок заходит в комнату ДО окончания анимации открытия двери
+	var fake_player = CharacterBody3D.new()
+	fake_player.add_to_group("player")
+	root_node.add_child(fake_player)
+	
+	manager._on_secret_room_body_entered(fake_player)
+	# Дверь должна принудительно захлопнуться обратно в начальное положение
+	assert(is_equal_approx(door_pivot.rotation_degrees.y, manager._initial_door_rot.y), "Дверь должна быть принудительно закрыта!")
+	
+	fake_player.queue_free()
+	door_pivot.queue_free()
+	cam_node.queue_free()
+	manager.queue_free()
+	print("✓ Тест 9 пройден")
+
+func test_terminal_proximity_and_gaze() -> void:
+	print("Тест 10: Проверка взаимодействия с терминалом (дистанция и направление взгляда)...")
+	var root_node = get_root()
+	var monitor_script = load("res://scripts/world/observation_monitor.gd")
+	var monitor = monitor_script.new()
+	monitor.position = Vector3.ZERO
+	
+	var screen_mesh = MeshInstance3D.new()
+	screen_mesh.position = Vector3(0.0, 0.0, 0.21)
+	monitor.add_child(screen_mesh)
+	monitor.screen_mesh = screen_mesh
+	root_node.add_child(monitor)
+	
+	# Игрок с головой и камерой
+	var player = CharacterBody3D.new()
+	player.name = "player"
+	player.add_to_group("player")
+	player.position = Vector3(0.0, 0.0, 1.65)
+	var head = Node3D.new()
+	head.name = "head"
+	player.add_child(head)
+	var cam = Camera3D.new()
+	cam.name = "Camera3D"
+	head.add_child(cam)
+	root_node.add_child(player)
+	
+	# 1. Игрок стоит вблизи (1.44м) и смотрит прямо на монитор (-Z)
+	cam.rotation = Vector3.ZERO
+	assert(monitor.is_player_looking_at_monitor() == true, "Вблизи и глядя на монитор -> доступно")
+	
+	# 2. Игрок стоит вблизи, но отвернулся (смотрит вправо на +X, yaw = -PI/2)
+	cam.rotation = Vector3(0.0, -PI * 0.5, 0.0)
+	assert(monitor.is_player_looking_at_monitor() == false, "Вблизи, но отвернувшись -> недоступно")
+	
+	# 3. Игрок смотрит на монитор, но отошел на 6 метров назад (z = 6.0)
+	cam.rotation = Vector3.ZERO
+	player.position = Vector3(0.0, 0.0, 6.0)
+	assert(monitor.is_player_looking_at_monitor() == false, "Издали -> недоступно")
+	
+	player.queue_free()
+	monitor.queue_free()
+	print("✓ Тест 10 пройден")

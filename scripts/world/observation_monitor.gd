@@ -14,6 +14,13 @@ signal revelation_finished
 @export var terminal_text: RichTextLabel
 @export var terminal_label: Control
 @export var hum_audio: AudioStreamPlayer3D
+@export var type_sound: AudioStream = preload("res://assets/sounds/type_sound.ogg")
+
+## Максимальная дистанция (в метрах) от экрана монитора для возможности взаимодействия
+@export_range(1.0, 8.0, 0.1) var max_interact_distance: float = 3.2
+
+## Минимальный скалярный косинус угла взгляда (0.80 ≈ отклонение не более 36°)
+@export_range(0.5, 0.99, 0.01) var min_look_dot: float = 0.80
 
 var is_awaiting_input: bool = true
 var is_terminal_running: bool = false
@@ -81,8 +88,7 @@ const PHASE_5_LINES: Array[String] = [
 	" ТЫ НИКОГДА НЕ ПРИНИМАЛ РЕШЕНИЙ.",
 	"",
 	" ТЫ ВСЕГДА БЫЛ ЛИШЬ ПЕШКОЙ.",
-	" ДЕШЕВОЙ ФИГУРОЙ НА ЧУЖОЙ ДОСКЕ,",
-	" КОТОРУЮ ВСЕГДА МОЖНО РАЗМЕНЯТЬ.»",
+	" ДЕШЕВОЙ ФИГУРОЙ НА ЧУЖОЙ ДОСКЕ.»",
 	"",
 	"> ПАРТИЯ ЗАВЕРШЕНА.",
 	"> ЖЕРТВА ПРИНЯТА."
@@ -128,39 +134,42 @@ func _setup_keystroke_audio() -> void:
 		_keystroke_player = AudioStreamPlayer.new()
 		_keystroke_player.name = "KeystrokePlayer"
 		_keystroke_player.bus = &"Sound"
-		_keystroke_player.max_polyphony = 4
+		_keystroke_player.max_polyphony = 6
 		add_child(_keystroke_player)
 		
-		# Синтез отчетливого механического клика клавиши CRT-терминала
-		var sample_rate: int = 44100
-		var duration: float = 0.022
-		var total_samples: int = int(duration * sample_rate)
-		var pcm = PackedByteArray()
-		pcm.resize(total_samples * 2)
-		
-		for i in range(total_samples):
-			var t: float = float(i) / float(sample_rate)
-			var snap: float = sin(t * TAU * 2200.0) * exp(-t * 260.0)
-			var body: float = sin(t * TAU * 780.0) * exp(-t * 140.0) * 0.55
-			var sample_f: float = clampf((snap + body) * 0.8, -1.0, 1.0)
-			var sample_i: int = int(sample_f * 32767.0)
-			pcm.encode_s16(i * 2, sample_i)
+		if type_sound != null:
+			_keystroke_player.stream = type_sound
+		else:
+			# Синтез отчетливого механического клика клавиши CRT-терминала
+			var sample_rate: int = 44100
+			var duration: float = 0.022
+			var total_samples: int = int(duration * sample_rate)
+			var pcm = PackedByteArray()
+			pcm.resize(total_samples * 2)
 			
-		var wav = AudioStreamWAV.new()
-		wav.format = AudioStreamWAV.FORMAT_16_BITS
-		wav.mix_rate = sample_rate
-		wav.data = pcm
-		_keystroke_player.stream = wav
+			for i in range(total_samples):
+				var t: float = float(i) / float(sample_rate)
+				var snap: float = sin(t * TAU * 2200.0) * exp(-t * 260.0)
+				var body: float = sin(t * TAU * 780.0) * exp(-t * 140.0) * 0.55
+				var sample_f: float = clampf((snap + body) * 0.8, -1.0, 1.0)
+				var sample_i: int = int(sample_f * 32767.0)
+				pcm.encode_s16(i * 2, sample_i)
+				
+			var wav = AudioStreamWAV.new()
+			wav.format = AudioStreamWAV.FORMAT_16_BITS
+			wav.mix_rate = sample_rate
+			wav.data = pcm
+			_keystroke_player.stream = wav
 
 func _play_keystroke_sound(is_space: bool = false) -> void:
 	if _keystroke_player == null or not is_inside_tree():
 		return
 	if is_space:
-		_keystroke_player.pitch_scale = randf_range(0.76, 0.86)
-		_keystroke_player.volume_db = -14.0
+		_keystroke_player.pitch_scale = randf_range(0.75, 0.88)
+		_keystroke_player.volume_db = -10.0
 	else:
-		_keystroke_player.pitch_scale = randf_range(0.94, 1.14)
-		_keystroke_player.volume_db = -7.0
+		_keystroke_player.pitch_scale = randf_range(0.85, 1.25)
+		_keystroke_player.volume_db = -4.0
 	_keystroke_player.play()
 
 func _process(delta: float) -> void:
@@ -182,6 +191,44 @@ func enable_terminal_input() -> void:
 	is_awaiting_input = true
 	_update_idle_prompt()
 
+## Проверка: находится ли игрок вблизи монитора и смотрит ли он точно на него
+func is_player_looking_at_monitor() -> bool:
+	var player = _get_player()
+	if player == null or not is_instance_valid(player):
+		return false
+		
+	var cam: Camera3D = null
+	if player.has_node("head/Camera3D"):
+		cam = player.get_node("head/Camera3D") as Camera3D
+	if cam == null:
+		for c in player.find_children("", "Camera3D", true, false):
+			cam = c as Camera3D
+			break
+	if cam == null and is_inside_tree():
+		cam = get_viewport().get_camera_3d()
+		
+	var target_mesh = screen_mesh if screen_mesh else self
+	var screen_pos: Vector3 = target_mesh.global_position if target_mesh.is_inside_tree() else target_mesh.position
+	var player_pos: Vector3 = player.global_position if player.is_inside_tree() else player.position
+	
+	# 1. Проверка дистанции: игрок должен находиться вблизи монитора
+	var horiz_dist: float = Vector2(player_pos.x - screen_pos.x, player_pos.z - screen_pos.z).length()
+	if horiz_dist > max_interact_distance:
+		return false
+		
+	# 2. Проверка взгляда: вектор камеры должен быть направлен прямо на монитор
+	if cam:
+		var cam_forward: Vector3 = -cam.global_transform.basis.z.normalized() if cam.is_inside_tree() else -cam.transform.basis.z.normalized()
+		var cam_pos: Vector3 = cam.global_position if cam.is_inside_tree() else (player_pos + cam.position)
+		var dir_to_screen: Vector3 = (screen_pos - cam_pos).normalized()
+		var dot: float = cam_forward.dot(dir_to_screen)
+		if dot < min_look_dot:
+			return false
+	else:
+		return false
+			
+	return true
+
 func _unhandled_input(event: InputEvent) -> void:
 	if not is_awaiting_input or is_terminal_running:
 		return
@@ -192,21 +239,25 @@ func _unhandled_input(event: InputEvent) -> void:
 			is_interact = true
 			
 	if is_interact:
-		var player = _get_player()
-		if player and is_instance_valid(player):
-			var dist_2d = Vector2(global_position.x - player.global_position.x, global_position.z - player.global_position.z).length()
-			if dist_2d > 12.0:
-				return
+		if not is_player_looking_at_monitor():
+			return
 		if is_inside_tree():
 			get_viewport().set_input_as_handled()
 		start_terminal_sequence()
 
 func _get_player() -> Node:
-	if not is_inside_tree():
-		return null
-	var players = get_tree().get_nodes_in_group("player")
-	if players.size() > 0:
-		return players[0]
+	if is_inside_tree() and get_tree():
+		for p in get_tree().get_nodes_in_group("player"):
+			if is_instance_valid(p) and not p.is_queued_for_deletion():
+				return p
+	var parent_node = get_parent()
+	if parent_node:
+		for child in parent_node.get_children():
+			if is_instance_valid(child) and not child.is_queued_for_deletion() and child.is_in_group("player"):
+				return child
+		var p = parent_node.find_child("player", true, false)
+		if is_instance_valid(p) and not p.is_queued_for_deletion():
+			return p
 	return get_node_or_null("../../player")
 
 ## Точка входа для запуска откровения (сохранена для обратной совместимости)
@@ -330,16 +381,24 @@ func _run_terminal_phases() -> void:
 	if is_inside_tree():
 		await get_tree().create_timer(0.3).timeout
 		
-	# Фаза 5: Откровение (Меньшая задержка, красный цвет, дрожащие буквы [shake], звук печати)
+	# Фаза 5: Откровение (Меньшая задержка, красный цвет, дрожащие буквы [shake], звук печати type_sound)
 	for line in PHASE_5_LINES:
 		if line.is_empty():
 			_append_line("")
 			if is_inside_tree():
 				await get_tree().create_timer(0.12).timeout
 		else:
-			await _type_shaking_red_line(line, 0.028)
+			var is_punchline: bool = (
+				line.contains("ПЕШКОЙ") or 
+				line.contains("ДЕШЕВОЙ ФИГУРОЙ") or 
+				line.contains("РАЗМЕНЯТЬ")
+			)
+			var delay: float = 0.085 if is_punchline else 0.028
+			var pause_after: float = 0.45 if is_punchline else 0.14
+			
+			await _type_shaking_red_line(line, delay)
 			if is_inside_tree():
-				await get_tree().create_timer(0.14).timeout
+				await get_tree().create_timer(pause_after).timeout
 				
 	if is_inside_tree():
 		await get_tree().create_timer(0.6).timeout

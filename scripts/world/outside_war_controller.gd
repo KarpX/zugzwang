@@ -22,6 +22,10 @@ const SOUND_NEAR_BOOMS: Array[AudioStream] = [
 const SOUND_SIREN: AudioStream = preload("res://assets/sounds/siren.ogg")
 const OutsideAudioGen = preload("res://scripts/world/outside_audio_generator.gd")
 
+@export_group("Stage 4 Bombardment")
+@export var bombardment_min_interval: float = 7.0
+@export var bombardment_max_interval: float = 16.0
+
 @export_group("Explicit Audio Players")
 @export var outside_sfx_player: AudioStreamPlayer3D
 @export var outside_sfx_player_near: AudioStreamPlayer3D
@@ -56,6 +60,10 @@ var _is_siren_loop_active: bool = false
 var _siren_delay_timer: SceneTreeTimer = null
 var _siren_interval: float = 15.0
 
+# Состояние периодической бомбардировки на 4 стадии
+var _is_stage4_bombardment_active: bool = false
+var _bombardment_timer: SceneTreeTimer = null
+
 # Вспомогательные аудиопотоки
 var _sound_front_rumble: AudioStreamWAV = null
 var _sound_storm_wind: AudioStreamWAV = null
@@ -85,9 +93,17 @@ func _ready() -> void:
 			bus.escalation_stage_changed.connect(_on_escalation_stage_changed)
 		if bus.has_signal("game_reset"):
 			bus.game_reset.connect(_on_game_reset)
+		if bus.has_signal("game_over"):
+			bus.game_over.connect(_on_game_over)
+		if bus.has_signal("collapse_sequence_started"):
+			bus.collapse_sequence_started.connect(_on_collapse_sequence_started)
 			
-		if "current_stage" in bus and bus.current_stage >= 2 and bus.current_stage < 4:
+		var cur_stage: int = bus.current_stage if "current_stage" in bus else 1
+		var out_stage: int = bus.outside_stage if "outside_stage" in bus else 0
+		if cur_stage >= 2 or out_stage >= 2:
 			_start_siren_loop()
+		if cur_stage >= 4 or out_stage >= 4:
+			_start_stage4_bombardment()
 
 func _init_audio_streams() -> void:
 	_sound_front_rumble = OutsideAudioGen.create_front_rumble_loop()
@@ -314,10 +330,15 @@ func _handle_enemy_queen() -> void:
 # ==============================================================================
 
 func _on_escalation_stage_changed(stage: int, _total_losses: int) -> void:
-	if stage >= 2 and stage < 4:
+	if stage >= 2:
 		_start_siren_loop()
-	elif stage >= 4:
-		_stop_siren_loop()
+	if stage >= 4:
+		_start_stage4_bombardment()
+	else:
+		var bus = _get_event_bus()
+		var out_stage: int = bus.outside_stage if (bus and "outside_stage" in bus) else 0
+		if out_stage < 4:
+			_stop_stage4_bombardment()
 
 func _on_outside_stage_changed(stage: int, _black_score: int) -> void:
 	match stage:
@@ -337,12 +358,79 @@ func _on_outside_stage_changed(stage: int, _black_score: int) -> void:
 				_radio_buzzer_player.stream = _sound_uvb76_buzzer
 				_radio_buzzer_player.play()
 		4:
-			# Стадия IV (осталось <= 3 очков): Мертвая пустыня — полная тишина
-			_stop_siren_loop()
+			# Стадия IV: сирена продолжает выть, начинаются периодические бомбардировки!
+			_start_siren_loop()
+			_start_stage4_bombardment()
 			if _outside_ambient_player:
 				_outside_ambient_player.stop()
 			if _radio_buzzer_player:
 				_radio_buzzer_player.stop()
+
+# ==============================================================================
+# ПЕРИОДИЧЕСКАЯ БОМБАРДИРОВКА (СТАДИЯ 4)
+# ==============================================================================
+
+## Запуск периодических случайных взрывов на 4 стадии
+func _start_stage4_bombardment() -> void:
+	if _is_stage4_bombardment_active:
+		return
+	_is_stage4_bombardment_active = true
+	_schedule_next_bombardment(randf_range(2.0, 4.5))
+
+## Остановка бомбардировки
+func _stop_stage4_bombardment() -> void:
+	_is_stage4_bombardment_active = false
+	_bombardment_timer = null
+
+func _schedule_next_bombardment(delay: float = -1.0) -> void:
+	if not _is_stage4_bombardment_active or not is_inside_tree():
+		return
+	var wait_time: float = delay if delay > 0.0 else randf_range(bombardment_min_interval, bombardment_max_interval)
+	_bombardment_timer = get_tree().create_timer(wait_time)
+	_bombardment_timer.timeout.connect(_on_bombardment_timeout)
+
+func _on_bombardment_timeout() -> void:
+	if not _is_stage4_bombardment_active:
+		return
+	trigger_random_bombardment()
+	_schedule_next_bombardment()
+
+## Генерация случайного взрыва бомбардировки со случайной громкостью,
+## сейсмическим толчком камеры и раскачиванием лампы
+func trigger_random_bombardment(forced_intensity: float = -1.0) -> void:
+	var intensity: float = forced_intensity if forced_intensity >= 0.0 else randf_range(0.2, 1.0)
+	intensity = clampf(intensity, 0.1, 1.0)
+	
+	# 1. Громкость звука взрыва: от тихого (-4.0 dB) до оглушительного (+9.0 dB)
+	var vol_db: float = lerpf(-4.0, 9.0, (intensity - 0.2) / 0.8)
+	
+	# 2. Выбор звука и воспроизведение
+	if intensity < 0.45:
+		# Тихий далекий разрыв
+		var idx: int = randi() % mini(2, SOUND_BOOMS.size())
+		var stream = SOUND_BOOMS[idx] if SOUND_BOOMS.size() > idx else null
+		_play_outside_boom(stream, vol_db, randf_range(0.95, 1.1))
+		_shake_door(0.025, 3)
+	elif intensity < 0.75:
+		# Средний взрыв
+		var idx: int = 1 if SOUND_BOOMS.size() > 1 else 0
+		_play_outside_boom(SOUND_BOOMS[idx], vol_db, randf_range(0.9, 1.05))
+		_shake_door(0.06 * intensity, 4)
+	else:
+		# Мощный близкий разрыв по перекрытиям бункера
+		if SOUND_NEAR_BOOMS.size() > 0 and randf() > 0.4:
+			var stream = SOUND_NEAR_BOOMS[randi() % SOUND_NEAR_BOOMS.size()]
+			_play_outside_near_boom(stream, vol_db, randf_range(0.85, 0.98))
+		else:
+			var idx: int = 2 if SOUND_BOOMS.size() > 2 else 0
+			_play_outside_boom(SOUND_BOOMS[idx], vol_db, randf_range(0.85, 0.98))
+		_shake_door(0.12 * intensity, 6)
+		
+	# 3. Эмит сейсмического импульса через EventBus:
+	# intensity напрямую регулирует толчок камеры (player.gd) и амплитуду лампочки (hanging_lamp.gd)
+	var bus = _get_event_bus()
+	if bus and bus.has_signal("seismic_shock_triggered"):
+		bus.seismic_shock_triggered.emit(intensity, true)
 
 ## Запуск бесконечного цикла сирен на втором этапе
 func _start_siren_loop() -> void:
@@ -422,8 +510,17 @@ func _shake_door(offset: float = 0.08, count: int = 5) -> void:
 		_door_shake_tween.tween_property(_door_node, "position", Vector3(shake_x, _initial_door_pos.y, shake_z), step_time)
 	_door_shake_tween.tween_property(_door_node, "position", _initial_door_pos, 0.06)
 
+func _on_game_over(_winner: String) -> void:
+	_stop_stage4_bombardment()
+	_stop_siren_loop()
+
+func _on_collapse_sequence_started() -> void:
+	_stop_stage4_bombardment()
+	_stop_siren_loop()
+
 func _on_game_reset(_playthrough: int) -> void:
 	_stop_siren_loop()
+	_stop_stage4_bombardment()
 	if _outside_sfx_player and _outside_sfx_player.playing:
 		_outside_sfx_player.stop()
 	if _outside_sfx_player_near and _outside_sfx_player_near.playing:

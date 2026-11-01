@@ -362,10 +362,16 @@ func _restore_default_lighting() -> void:
 	light_intensity_ratio = 1.0
 	_apply_light_intensity(1.0)
 
-## Реакция лампы на наружные подземные толчки и взрывы (потери врага)
+## Реакция лампы на наружные подземные толчки и взрывы (потери врага и бомбардировка)
 func _on_seismic_shock_triggered(intensity: float, _is_subterranean: bool) -> void:
-	var lamp_impulse: float = clampf(intensity * 0.40, 0.12, 0.45)
-	trigger_amplitude_burst(lamp_impulse, 4.5 + intensity * 2.0)
+	# Амплитуда толчка строго пропорциональна громкости/силе взрыва:
+	# При слабом/далеком взрыве импульс ~0.07..0.10 (легкое покачивание чуть выше базового 0.035),
+	# При сильном взрыве импульс до 0.48 (мощный размах со скрипом подвеса).
+	# После толчка trigger_amplitude_burst плавно возвращает лампу к DEFAULT_BASE_AMPLITUDE.
+	var lamp_impulse: float = clampf(intensity * 0.45 + 0.01, 0.06, 0.48)
+	var decay: float = 3.5 + intensity * 3.0
+	var push_time: float = clampf(0.25 + intensity * 0.35, 0.25, 0.60)
+	trigger_amplitude_burst(lamp_impulse, decay, push_time)
 
 ## Применение текущего коэффициента к источнику света и материалу колбы
 func _apply_light_intensity(ratio: float) -> void:

@@ -119,19 +119,27 @@ func _build_ui() -> void:
 ## [param display_duration]: Время показа экрана перед автоматическим исчезновением
 ## [param on_restoration]: Колбэк для восстановления сцены под прикрытием чёрного экрана
 ## [param on_completed]: Колбэк по окончании исчезновения экрана (возврат управления игроку)
+## [param title_text]: Заголовок экрана (по умолчанию "П О Р А Ж Е Н И Е")
+## [param hint_text]: Нижняя подсказка игроку
 func show_defeat(
 	quote_text: String = "",
 	display_duration: float = 3.5,
 	on_restoration: Callable = Callable(),
-	on_completed: Callable = Callable()
+	on_completed: Callable = Callable(),
+	title_text: String = "П О Р А Ж Е Н И Е",
+	hint_text: String = "Фигуры расставлены заново. Сделайте следующий ход."
 ) -> void:
 	_on_restoration_callback = on_restoration
 	_on_completed_callback = on_completed
 	
 	_build_ui()
 	
+	if not title_text.is_empty() and _title_label != null:
+		_title_label.text = title_text
 	if not quote_text.is_empty() and _quote_label != null:
 		_quote_label.text = quote_text
+	if not hint_text.is_empty() and _hint_label != null:
+		_hint_label.text = hint_text
 		
 	# РЕЗКОЕ появление: прозрачность моментально 1.0 (никаких плавных затуханий перед появлением)
 	if _container != null:

@@ -30,9 +30,11 @@ var _audio_player: AudioStreamPlayer3D = null
 var _tension_audio_player: AudioStreamPlayer = null
 var _final_music_player: AudioStreamPlayer = null
 var _final_music_tween: Tween = null
+var _door_tween: Tween = null
 var _is_ending_active: bool = false
 var _initial_env_fog_color: Color = Color.WHITE
 var _initial_door_rot: Vector3 = Vector3.ZERO
+var _initial_door_pos: Vector3 = Vector3.ZERO
 var _spawned_particles: Array[Node] = []
 
 func _get_event_bus() -> Node:
@@ -80,8 +82,10 @@ func _resolve_scene_nodes() -> void:
 			door_node = get_node_or_null("../walls/Door") as Node3D
 	if door_pivot:
 		_initial_door_rot = door_pivot.rotation_degrees
+		_initial_door_pos = door_pivot.position
 	elif door_node:
 		_initial_door_rot = door_node.rotation_degrees
+		_initial_door_pos = door_node.position
 	if hanging_bulb == null:
 		hanging_bulb = get_node_or_null("../HangingBulb") as MeshInstance3D
 	if radio_dial_light == null:
@@ -257,20 +261,51 @@ func _show_abrupt_defeat_screen() -> void:
 	defeat_screen.name = "DefeatScreen"
 	add_child(defeat_screen)
 	
+	var on_restore = func():
+		_restore_scene_under_black_screen(true)
+		
 	defeat_screen.show_defeat(
 		quote_text,
 		defeat_screen_display_duration,
-		_restore_scene_under_black_screen,
-		_finalize_player_control_after_defeat
+		on_restore,
+		_finalize_player_control_after_defeat,
+		"П О Р А Ж Е Н И Е",
+		"Фигуры расставлены заново. Сделайте следующий ход."
+	)
+
+## Резкое появление чёрного экрана с текстом пата
+func _show_abrupt_draw_screen() -> void:
+	var bus: Node = _get_event_bus()
+	var quote_text: String = ""
+	if bus and bus.has_method("get_random_draw_quote"):
+		quote_text = bus.get_random_draw_quote()
+	if quote_text.is_empty():
+		quote_text = "«Война не принимает ничьих. Защищай короля до конца.»"
+		
+	var defeat_screen = DefeatScreenScript.new()
+	defeat_screen.name = "DefeatScreen"
+	add_child(defeat_screen)
+	
+	var on_restore = func():
+		_restore_scene_under_black_screen(false)
+		
+	defeat_screen.show_defeat(
+		quote_text,
+		defeat_screen_display_duration,
+		on_restore,
+		_finalize_player_control_after_defeat,
+		"П А Т",
+		"Партия завершилась вничью. Расставьте фигуры заново."
 	)
 
 ## Полное восстановление сцены бункера, шахматной доски и игрока под чёрным экраном
-func _restore_scene_under_black_screen() -> void:
+func _restore_scene_under_black_screen(is_defeat: bool = true) -> void:
 	var bus: Node = _get_event_bus()
 	if bus:
-		bus.death_count += 1
-		bus.player_losses += 1
-		bus.current_playthrough = maxi(2, bus.current_playthrough + 1)
+		if is_defeat:
+			bus.death_count += 1
+			bus.player_losses += 1
+			bus.current_playthrough = maxi(2, bus.current_playthrough + 1)
 		bus.reset_game_state(bus.current_playthrough)
 		
 	# 1. Восстановление бункера, освещения, тумана, двери и камеры наблюдения
@@ -296,6 +331,7 @@ func _restore_scene_under_black_screen() -> void:
 		if cam:
 			cam.h_offset = 0.0
 			cam.v_offset = 0.0
+			cam.position.y = -0.89668
 			cam.rotation_degrees.z = 0.0
 			
 		var head_node = player_node.get_node_or_null("head") as Node3D
@@ -375,21 +411,26 @@ func _turn_off_lights() -> void:
 
 func _play_white_victory() -> void:
 	_is_ending_active = true
-	if security_camera and security_camera.has_method("toggle_follow"):
-		security_camera.toggle_follow()
+	if security_camera:
+		if security_camera.has_method("toggle_follow"):
+			security_camera.toggle_follow(true)
+		if security_camera.has_method("stop_camera_sound"):
+			security_camera.stop_camera_sound()
 	_setup_audio_player()
 	# 1. Тяжелый звук открывания гермозамков
-	var knock_sfx = preload("res://assets/sounds/knock2.ogg")
+	var knock_sfx = preload("res://assets/sounds/door_open.ogg")
 	var door_pos: Vector3 = door_node.global_position if (door_node and door_node.is_inside_tree()) else Vector3(16, 2, 0)
-	_play_audio(knock_sfx, 6.0, door_pos)
+	_play_audio(knock_sfx, -5.0, door_pos)
 	
 	# 2. Плавное распахивание тяжелой двери бункера
 	var target_door = door_pivot if door_pivot else door_node
 	if target_door and is_inside_tree():
-		var door_tween = create_tween().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-		door_tween.tween_interval(0.6)
+		if _door_tween and _door_tween.is_valid():
+			_door_tween.kill()
+		_door_tween = create_tween().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		_door_tween.tween_interval(0.6)
 		# Вращаем дверь на петле
-		door_tween.tween_property(target_door, "rotation_degrees:y", _initial_door_rot.y - 88.0, 3.2)
+		_door_tween.tween_property(target_door, "rotation_degrees:y", _initial_door_rot.y - 88.0, 3.2)
 	elif target_door:
 		target_door.rotation_degrees.y = _initial_door_rot.y - 88.0
 	
@@ -422,8 +463,11 @@ func _on_secret_room_body_entered(body: Node3D) -> void:
 	
 	var target_door = door_pivot if door_pivot else door_node
 	if target_door and is_inside_tree():
-		var slam_tween = create_tween().set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
-		slam_tween.tween_property(target_door, "rotation_degrees:y", _initial_door_rot.y, 0.35)
+		# Немедленно прерываем анимацию открытия двери, если она еще длится
+		if _door_tween and _door_tween.is_valid():
+			_door_tween.kill()
+		_door_tween = create_tween().set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+		_door_tween.tween_property(target_door, "rotation_degrees:y", _initial_door_rot.y, 0.35)
 	elif target_door:
 		target_door.rotation_degrees.y = _initial_door_rot.y
 		
@@ -537,6 +581,12 @@ func _on_revelation_finished() -> void:
 func _play_draw_ending() -> void:
 	_is_ending_active = true
 	_setup_audio_player()
+	
+	# Блокируем перемещение игрока на время драматического финала
+	if player_node:
+		player_node.can_walk = false
+		player_node.can_move = false
+		
 	# 1. Внезапный яростный стук в дверь (knock3)
 	var knock_sfx = preload("res://assets/sounds/knock3.ogg")
 	var door_pos: Vector3 = door_node.global_position if (door_node and door_node.is_inside_tree()) else Vector3(16, 2, 0)
@@ -545,11 +595,14 @@ func _play_draw_ending() -> void:
 	# Тряска двери
 	var target_door = door_pivot if door_pivot else door_node
 	if target_door and is_inside_tree():
-		var dt = create_tween()
+		if _door_tween and _door_tween.is_valid():
+			_door_tween.kill()
+		_door_tween = create_tween()
 		for i in range(8):
 			var offset: float = 0.15 if (i % 2 == 0) else -0.15
-			dt.tween_property(target_door, "position:z", target_door.position.z + offset, 0.06)
-		dt.tween_property(target_door, "rotation_degrees:y", -25.0, 0.1) # Дверь приоткрывается
+			var base_z: float = _initial_door_pos.z if _initial_door_pos != Vector3.ZERO else target_door.position.z
+			_door_tween.tween_property(target_door, "position:z", base_z + offset, 0.06)
+		_door_tween.tween_property(target_door, "rotation_degrees:y", -25.0, 0.1) # Дверь приоткрывается
 	elif target_door:
 		target_door.rotation_degrees.y = -25.0
 		
@@ -574,10 +627,12 @@ func _play_draw_ending() -> void:
 				fall_tween.tween_property(cam, "position:y", -1.8, 0.4)
 				fall_tween.parallel().tween_property(cam, "rotation_degrees:z", 35.0, 0.4)
 				
-		# 3. Перезапуск с загадочной фразой о войне и ничьей
-		var reload_timer = get_tree().create_timer(3.0)
-		reload_timer.timeout.connect(func():
-			_fade_and_reload("draw")
+		# 3. После окончания звуков выстрелов и падения (через 1.4 секунды) — РЕЗКО чёрный экран!
+		var assault_finish_timer = get_tree().create_timer(1.4)
+		assault_finish_timer.timeout.connect(func():
+			if _audio_player and _audio_player.playing:
+				_audio_player.stop()
+			_show_abrupt_draw_screen()
 		)
 	)
 
@@ -622,7 +677,11 @@ func restore_room_to_initial() -> void:
 	# 4. Закрытие двери
 	var target_door = door_pivot if door_pivot else door_node
 	if target_door:
+		if _door_tween and _door_tween.is_valid():
+			_door_tween.kill()
 		target_door.rotation_degrees.y = _initial_door_rot.y
+		if _initial_door_pos != Vector3.ZERO:
+			target_door.position = _initial_door_pos
 		
 	# 5. Возврат управления игроку
 	if player_node:

@@ -35,12 +35,21 @@ var _twitch_quat: Quaternion = Quaternion.IDENTITY
 var _twitch_tween: Tween = null
 var _not_follow = false
 
-func toggle_follow(value = null):
-	if value:
-		_not_follow = value
-		return
-	
-	_not_follow = not(_not_follow)
+func toggle_follow(value = null) -> void:
+	if value != null:
+		_not_follow = bool(value)
+	else:
+		_not_follow = not _not_follow
+	if _not_follow:
+		stop_camera_sound()
+
+## Принудительная остановка звука движения камеры и сброс таймера
+func stop_camera_sound() -> void:
+	_sound_timer = 0.0
+	if camera_sound and is_instance_valid(camera_sound):
+		camera_sound.stop()
+	if _twitch_tween and _twitch_tween.is_valid():
+		_twitch_tween.kill()
 
 func _get_event_bus() -> Node:
 	if not is_inside_tree():
@@ -98,7 +107,7 @@ func _on_piece_captured(piece_type: String, is_white: bool) -> void:
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PAUSED or what == NOTIFICATION_DISABLED or what == NOTIFICATION_UNPARENTED:
-		_update_camera_sound(false)
+		stop_camera_sound()
 
 func _resolve_target() -> void:
 	if target and is_instance_valid(target):
@@ -123,6 +132,7 @@ func _resolve_target() -> void:
 
 func _process(delta: float) -> void:
 	if not is_inside_tree() or _not_follow:
+		stop_camera_sound()
 		return
 
 	if not target or not is_instance_valid(target):

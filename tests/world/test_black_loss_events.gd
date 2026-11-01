@@ -153,7 +153,7 @@ func _run_tests() -> void:
 	print("[PASS] Тест 9: Макро-стадия III достигнута (10 очков, ураганный ветер, зуммер радио)")
 	
 	# --------------------------------------------------------------------------
-	# ТЕСТ 10: Макро-стадия IV — Мертвая пустыня (Счет Черных <= 3 очков)
+	# ТЕСТ 10: Макро-стадия IV — Сирена продолжает выть и периодические бомбардировки
 	# --------------------------------------------------------------------------
 	bus.piece_captured.emit("knight", false) # 10 -> 7
 	bus.piece_captured.emit("bishop", false) # 7 -> 4
@@ -161,12 +161,24 @@ func _run_tests() -> void:
 	
 	assert(bus.black_score == 3, "У Черных осталось ровно 3 очка")
 	assert(bus.outside_stage == 4, "Стадия внешнего мира перешла в 4 (Мертвая пустыня)")
-	assert(outside_ctrl._is_siren_loop_active == false, "Цикл сирен полностью остановлен на Стадии IV")
-	assert(outside_ctrl._siren_player.playing == false, "Плеер сирены остановлен")
-	assert(outside_ctrl._outside_ambient_player.playing == false, "Наружный плеер эмбиента остановлен")
-	assert(outside_ctrl._radio_buzzer_player.playing == false, "Радио-зуммер остановлен")
+	assert(outside_ctrl._is_siren_loop_active == true, "Цикл сирен ДОЛЖЕН продолжать работать на Стадии IV")
+	assert(outside_ctrl._is_stage4_bombardment_active == true, "Периодическая бомбардировка должна быть активна на Стадии IV")
 	assert(player._radio_subtitle_label.text.find("мертвая тишина") != -1 or player._radio_subtitle_label.text.find("некому выходить") != -1, "Финальный радио-перехват тишины: %s" % player._radio_subtitle_label.text)
-	print("[PASS] Тест 10: Макро-стадия IV достигнута (3 очка, Мертвая пустыня: сирены и звуки затихли, полная тишина)")
+	
+	# Проверка регуляции бомбардировки: слабый взрыв (0.25) vs сильный взрыв (0.95)
+	player._trauma = 0.0
+	outside_ctrl.trigger_random_bombardment(0.25)
+	assert(player._trauma > 0.0 and player._trauma <= 0.35, "Слабый взрыв дает небольшой толчок камеры (trauma=%.2f)" % player._trauma)
+	var weak_lamp_burst: float = lamp.target_burst_amplitude
+	assert(weak_lamp_burst > 0.05 and weak_lamp_burst < 0.20, "Слабый взрыв дает небольшое раскачивание лампы (amp=%.2f)" % weak_lamp_burst)
+	
+	player._trauma = 0.0
+	outside_ctrl.trigger_random_bombardment(0.95)
+	assert(player._trauma >= 0.85, "Сильный взрыв дает мощный сейсмический толчок камеры (trauma=%.2f)" % player._trauma)
+	var strong_lamp_burst: float = lamp.target_burst_amplitude
+	assert(strong_lamp_burst > weak_lamp_burst and strong_lamp_burst >= 0.40, "Сильный взрыв раскачивает лампу сильнее слабого (amp=%.2f > %.2f)" % [strong_lamp_burst, weak_lamp_burst])
+	
+	print("[PASS] Тест 10: Макро-стадия IV достигнута (сирена продолжает выть, активна периодическая бомбардировка со случайной громкостью, сейсмикой и качанием лампы)")
 	
 	# --------------------------------------------------------------------------
 	# ТЕСТ 11: Уникальность радиоперехватов эфира врага (строки не повторяются)
