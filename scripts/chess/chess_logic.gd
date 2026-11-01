@@ -25,6 +25,9 @@ var move_count: int = 0
 var is_game_over: bool = false
 var winner: String = "" # "white", "black", "draw"
 
+## Целевая клетка для взятия на проходе (en passant target), Vector2i(-1, -1) если недоступно
+var en_passant_target: Vector2i = Vector2i(-1, -1)
+
 ## Номер прохождения:
 ## 1: Первое прохождение (высокая сложность, жадный хищный ИИ истребления армии игрока перед матом)
 ## 2: Второе прохождение (средняя сложность, поддающийся ИИ выживания, отдающий фигуры ради спасения короля)
@@ -49,6 +52,7 @@ func reset_board(new_playthrough: int = -1) -> void:
 	move_count = 0
 	is_game_over = false
 	winner = ""
+	en_passant_target = Vector2i(-1, -1)
 	
 	_setup_initial_pieces()
 
@@ -165,17 +169,18 @@ func _get_pawn_moves(pos: Vector2i, is_white: bool, has_moved: bool) -> Array[Ve
 		moves.append(one_step)
 		# Шаг вперед на 2 клетки с начальной позиции
 		var two_step: Vector2i = Vector2i(pos.x, pos.y + forward_dir * 2)
-		if not has_moved and is_empty(two_step):
+		var start_rank: int = 1 if is_white else 6
+		if pos.y == start_rank and not has_moved and is_empty(two_step):
 			moves.append(two_step)
 	
-	# Взятие по диагонали влево и вправо
-	var diag_left: Vector2i = Vector2i(pos.x - 1, pos.y + forward_dir)
-	if is_enemy(diag_left, is_white):
-		moves.append(diag_left)
-		
-	var diag_right: Vector2i = Vector2i(pos.x + 1, pos.y + forward_dir)
-	if is_enemy(diag_right, is_white):
-		moves.append(diag_right)
+	# Взятие по диагонали влево и вправо (включая взятие на проходе)
+	for dx in [-1, 1]:
+		var diag: Vector2i = Vector2i(pos.x + dx, pos.y + forward_dir)
+		if is_inside(diag):
+			if is_enemy(diag, is_white):
+				moves.append(diag)
+			elif diag == en_passant_target and en_passant_target != Vector2i(-1, -1):
+				moves.append(diag)
 		
 	return moves
 
@@ -313,9 +318,15 @@ func _does_move_leave_king_in_check(from_pos: Vector2i, to_pos: Vector2i, is_whi
 	var source_piece = grid[from_pos.x][from_pos.y]
 	var target_piece = grid[to_pos.x][to_pos.y]
 	
+	var is_ep: bool = (source_piece != null and source_piece["type"] == "pawn" and to_pos == en_passant_target and en_passant_target != Vector2i(-1, -1))
+	var ep_victim_pos: Vector2i = Vector2i(to_pos.x, from_pos.y) if is_ep else Vector2i(-1, -1)
+	var ep_victim_piece = grid[ep_victim_pos.x][ep_victim_pos.y] if is_ep else null
+	
 	# Симулируем ход
 	grid[to_pos.x][to_pos.y] = source_piece
 	grid[from_pos.x][from_pos.y] = null
+	if is_ep:
+		grid[ep_victim_pos.x][ep_victim_pos.y] = null
 	
 	var king_pos: Vector2i = to_pos if source_piece["type"] == "king" else find_king(is_white)
 	var in_check: bool = false
@@ -325,6 +336,8 @@ func _does_move_leave_king_in_check(from_pos: Vector2i, to_pos: Vector2i, is_whi
 	# Откатываем симуляцию
 	grid[from_pos.x][from_pos.y] = source_piece
 	grid[to_pos.x][to_pos.y] = target_piece
+	if is_ep:
+		grid[ep_victim_pos.x][ep_victim_pos.y] = ep_victim_piece
 	
 	return in_check
 
@@ -391,16 +404,34 @@ func make_move(from_pos: Vector2i, to_pos: Vector2i, promotion_type: String = "q
 		result["rook_from"] = rook_from
 		result["rook_to"] = rook_to
 	
-	# Проверка взятия
+	# Проверка взятия (включая взятие на проходе)
+	var is_en_passant: bool = (piece["type"] == "pawn" and to_pos == en_passant_target and en_passant_target != Vector2i(-1, -1))
 	if target != null:
 		result["captured"] = true
 		result["captured_piece"] = target["type"]
 		result["captured_is_white"] = target["is_white"]
+	elif is_en_passant:
+		var ep_victim_pos: Vector2i = Vector2i(to_pos.x, from_pos.y)
+		var ep_victim = grid[ep_victim_pos.x][ep_victim_pos.y]
+		if ep_victim != null:
+			result["captured"] = true
+			result["captured_piece"] = ep_victim["type"]
+			result["captured_is_white"] = ep_victim["is_white"]
+			result["en_passant"] = true
+			result["en_passant_captured_pos"] = ep_victim_pos
+			grid[ep_victim_pos.x][ep_victim_pos.y] = null
 		
 	# Перемещение фигуры
 	grid[to_pos.x][to_pos.y] = piece
 	grid[from_pos.x][from_pos.y] = null
 	piece["has_moved"] = true
+	
+	# Обновление целевой клетки для взятия на проходе (en passant target)
+	if piece["type"] == "pawn" and abs(to_pos.y - from_pos.y) == 2:
+		var mid_y: int = int((from_pos.y + to_pos.y) / 2)
+		en_passant_target = Vector2i(from_pos.x, mid_y)
+	else:
+		en_passant_target = Vector2i(-1, -1)
 	
 	# Превращение пешки на последней горизонтали
 	if piece["type"] == "pawn":
@@ -462,7 +493,7 @@ func has_any_legal_moves(is_white: bool) -> bool:
 ## В 1-м прохождении: Hard, пожирание всех фигур белых перед матом
 ## Во 2-м прохождении: Medium, поддавки, жертвование фигур ради выживания короля
 func get_best_ai_move() -> Dictionary:
-	var move: Dictionary = ChessBot.choose_best_move(grid, playthrough)
+	var move: Dictionary = ChessBot.choose_best_move(grid, playthrough, 0, en_passant_target)
 	if not move.is_empty():
 		return move
 	return _fallback_ai_move()
