@@ -9,7 +9,7 @@ func _init() -> void:
 	test_board_reset_and_playthrough()
 	test_door_knock_timer_reset()
 	test_checkmate_restart_integration()
-	test_debug_instant_endings()
+	# test_debug_instant_endings() # [Отключено для релизного билда: отладочные функции закомментированы]
 	print("--- All restart tests passed successfully! ---")
 	quit(0)
 
@@ -98,27 +98,27 @@ func test_checkmate_restart_integration() -> void:
 	board_view.queue_free()
 	print("✓ test_checkmate_restart_integration passed")
 
-func test_debug_instant_endings() -> void:
-	var board_scene = preload("res://scenes/chess/chess_board.tscn")
-	var board_view = board_scene.instantiate()
-	var root_node = get_root()
-	root_node.add_child(board_view)
-	board_view.restart_game(1)
-	
-	# Тест F5: мгновенная победа белых
-	board_view.trigger_debug_win()
-	assert(board_view.logic.is_game_over == true, "Игра должна быть завершена после trigger_debug_win")
-	assert(board_view.logic.winner == "white", "Победитель должен быть white")
-	
-	# Тест F6: мгновенное поражение белых (победа черных)
-	board_view.trigger_debug_loss()
-	assert(board_view.logic.is_game_over == true, "Игра должна быть завершена после trigger_debug_loss")
-	assert(board_view.logic.winner == "black", "Победитель должен быть black")
-	
-	# Тест F7: мгновенный пат
-	board_view.trigger_debug_draw()
-	assert(board_view.logic.is_game_over == true, "Игра должна быть завершена после trigger_debug_draw")
-	assert(board_view.logic.winner == "draw", "Победитель должен быть draw")
-	
-	board_view.queue_free()
-	print("✓ test_debug_instant_endings passed")
+# func test_debug_instant_endings() -> void:
+# 	var board_scene = preload("res://scenes/chess/chess_board.tscn")
+# 	var board_view = board_scene.instantiate()
+# 	var root_node = get_root()
+# 	root_node.add_child(board_view)
+# 	board_view.restart_game(1)
+# 	
+# 	# Тест F5: мгновенная победа белых
+# 	board_view.trigger_debug_win()
+# 	assert(board_view.logic.is_game_over == true, "Игра должна быть завершена после trigger_debug_win")
+# 	assert(board_view.logic.winner == "white", "Победитель должен быть white")
+# 	
+# 	# Тест F6: мгновенное поражение белых (победа черных)
+# 	board_view.trigger_debug_loss()
+# 	assert(board_view.logic.is_game_over == true, "Игра должна быть завершена после trigger_debug_loss")
+# 	assert(board_view.logic.winner == "black", "Победитель должен быть black")
+# 	
+# 	# Тест F7: мгновенный пат
+# 	board_view.trigger_debug_draw()
+# 	assert(board_view.logic.is_game_over == true, "Игра должна быть завершена после trigger_debug_draw")
+# 	assert(board_view.logic.winner == "draw", "Победитель должен быть draw")
+# 	
+# 	board_view.queue_free()
+# 	print("✓ test_debug_instant_endings passed")

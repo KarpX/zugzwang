@@ -125,7 +125,7 @@ func _ready() -> void:
 		
 	ChessBotScript._init_zobrist()
 	spawn_pieces()
-	debug_hud.setup(self)
+	# debug_hud.setup(self) # [DEBUG HUD ОТКЛЮЧЕН ДЛЯ РЕЛИЗА]
 	_start_pondering()
 	
 	# Подписываемся на события шины
@@ -201,8 +201,9 @@ func _process(delta: float) -> void:
 	else:
 		_black_turn_timer = 0.0
 
-	if debug_hud != null and debug_hud.is_visible():
-		debug_hud.update(logic, is_fast_mode, _is_ai_calculating, is_ai_thinking, _get_event_bus())
+	# [DEBUG HUD ОТКЛЮЧЕН ДЛЯ РЕЛИЗА]
+	# if debug_hud != null and debug_hud.is_visible():
+	# 	debug_hud.update(logic, is_fast_mode, _is_ai_calculating, is_ai_thinking, _get_event_bus())
 
 ## Аварийное восстановление при зависании или сверхдолгом ходе ИИ
 func _recover_stuck_ai_turn() -> void:
@@ -226,72 +227,75 @@ func _recover_stuck_ai_turn() -> void:
 	else:
 		is_ai_thinking = false
 
-func _input(event: InputEvent) -> void:
-	if event is InputEventKey and event.pressed and not event.echo:
-		var code: Key = event.keycode if event.keycode != KEY_NONE else event.physical_keycode
-		match code:
-			KEY_F1:
-				restart_game(1)
-				_update_debug_hud()
-			KEY_F2:
-				restart_game(2)
-				_update_debug_hud()
-			KEY_F3:
-				toggle_fast_mode()
-				_update_debug_hud()
-			KEY_F4:
-				toggle_debug_hud()
-			KEY_F5:
-				trigger_debug_win()
-			KEY_F6:
-				trigger_debug_loss()
-			KEY_F7:
-				trigger_debug_draw()
-
-## Отладочная моментальная победа Белых (Игрок)
-func trigger_debug_win() -> void:
-	if logic == null:
-		logic = ChessLogicScript.new()
-	logic.is_game_over = true
-	logic.winner = "white"
-	clear_selection()
-	_clear_highlights()
-	_cleanup_ai_thread()
-	is_ai_thinking = false
-	var bus = _get_event_bus()
-	if bus:
-		bus.game_over.emit("white")
-	_update_debug_hud()
-
-## Отладочное моментальное поражение Белых (Победа Чёрных)
-func trigger_debug_loss() -> void:
-	if logic == null:
-		logic = ChessLogicScript.new()
-	logic.is_game_over = true
-	logic.winner = "black"
-	clear_selection()
-	_clear_highlights()
-	_cleanup_ai_thread()
-	is_ai_thinking = false
-	var bus = _get_event_bus()
-	if bus:
-		bus.game_over.emit("black")
-	_update_debug_hud()
-
-## Отладочный моментальный пат (Ничья)
-func trigger_debug_draw() -> void:
-	if logic == null:
-		logic = ChessLogicScript.new()
-	logic.is_game_over = true
-	logic.winner = "draw"
-	clear_selection()
-	_clear_highlights()
-	_cleanup_ai_thread()
-	is_ai_thinking = false
-	var bus = _get_event_bus()
-	if bus:
-		bus.game_over.emit("draw")
-	_update_debug_hud()
+# ==============================================================================
+# ОТЛАДОЧНЫЕ ГОРЯЧИЕ КЛАВИШИ И ФУНКЦИИ (F1-F7) - ЗАКОММЕНТИРОВАНО ДЛЯ РЕЛИЗА
+# ==============================================================================
+# func _input(event: InputEvent) -> void:
+# 	if event is InputEventKey and event.pressed and not event.echo:
+# 		var code: Key = event.keycode if event.keycode != KEY_NONE else event.physical_keycode
+# 		match code:
+# 			KEY_F1:
+# 				restart_game(1)
+# 				_update_debug_hud()
+# 			KEY_F2:
+# 				restart_game(2)
+# 				_update_debug_hud()
+# 			KEY_F3:
+# 				toggle_fast_mode()
+# 				_update_debug_hud()
+# 			KEY_F4:
+# 				toggle_debug_hud()
+# 			KEY_F5:
+# 				trigger_debug_win()
+# 			KEY_F6:
+# 				trigger_debug_loss()
+# 			KEY_F7:
+# 				trigger_debug_draw()
+# 
+# ## Отладочная моментальная победа Белых (Игрок)
+# func trigger_debug_win() -> void:
+# 	if logic == null:
+# 		logic = ChessLogicScript.new()
+# 	logic.is_game_over = true
+# 	logic.winner = "white"
+# 	clear_selection()
+# 	_clear_highlights()
+# 	_cleanup_ai_thread()
+# 	is_ai_thinking = false
+# 	var bus = _get_event_bus()
+# 	if bus:
+# 		bus.game_over.emit("white")
+# 	_update_debug_hud()
+# 
+# ## Отладочное моментальное поражение Белых (Победа Чёрных)
+# func trigger_debug_loss() -> void:
+# 	if logic == null:
+# 		logic = ChessLogicScript.new()
+# 	logic.is_game_over = true
+# 	logic.winner = "black"
+# 	clear_selection()
+# 	_clear_highlights()
+# 	_cleanup_ai_thread()
+# 	is_ai_thinking = false
+# 	var bus = _get_event_bus()
+# 	if bus:
+# 		bus.game_over.emit("black")
+# 	_update_debug_hud()
+# 
+# ## Отладочный моментальный пат (Ничья)
+# func trigger_debug_draw() -> void:
+# 	if logic == null:
+# 		logic = ChessLogicScript.new()
+# 	logic.is_game_over = true
+# 	logic.winner = "draw"
+# 	clear_selection()
+# 	_clear_highlights()
+# 	_cleanup_ai_thread()
+# 	is_ai_thinking = false
+# 	var bus = _get_event_bus()
+# 	if bus:
+# 		bus.game_over.emit("draw")
+# 	_update_debug_hud()
 
 func _init_materials() -> void:
 	white_mat = preload("res://assets/obj/chess/chess_white_material.tres")
@@ -457,31 +461,31 @@ func restart_game(next_playthrough: int = -1) -> void:
 	if is_inside_tree():
 		_play_player_move_sound(to_global(cell_to_local_pos(Vector2i(4, 0))))
 		
-	_update_debug_hud()
+	# _update_debug_hud() # [DEBUG HUD ОТКЛЮЧЕН ДЛЯ РЕЛИЗА]
 	_start_pondering()
 
 # ==============================================================================
-# ОТЛАДОЧНЫЙ РЕЖИМ (Debug HUD & Controls)
+# ОТЛАДОЧНЫЙ РЕЖИМ (Debug HUD & Controls) - ЗАКОММЕНТИРОВАНО ДЛЯ РЕЛИЗА
 # ==============================================================================
 
-func toggle_fast_mode() -> void:
-	is_fast_mode = not is_fast_mode
-	if is_fast_mode:
-		white_move_duration = 0.05
-		black_move_duration = 0.05
-		ai_turn_delay = 0.02
-	else:
-		white_move_duration = 0.35
-		black_move_duration = 0.8
-		ai_turn_delay = 0.2
-
-func toggle_debug_hud() -> void:
-	if debug_hud != null:
-		debug_hud.toggle_visibility()
-
-func _update_debug_hud() -> void:
-	if debug_hud != null and debug_hud.is_visible():
-		debug_hud.update(logic, is_fast_mode, _is_ai_calculating, is_ai_thinking, _get_event_bus())
+# func toggle_fast_mode() -> void:
+# 	is_fast_mode = not is_fast_mode
+# 	if is_fast_mode:
+# 		white_move_duration = 0.05
+# 		black_move_duration = 0.05
+# 		ai_turn_delay = 0.02
+# 	else:
+# 		white_move_duration = 0.35
+# 		black_move_duration = 0.8
+# 		ai_turn_delay = 0.2
+# 
+# func toggle_debug_hud() -> void:
+# 	if debug_hud != null:
+# 		debug_hud.toggle_visibility()
+# 
+# func _update_debug_hud() -> void:
+# 	if debug_hud != null and debug_hud.is_visible():
+# 		debug_hud.update(logic, is_fast_mode, _is_ai_calculating, is_ai_thinking, _get_event_bus())
 
 func _on_camera_mode_changed(is_board_mode: bool) -> void:
 	is_active = is_board_mode

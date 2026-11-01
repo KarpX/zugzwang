@@ -15,6 +15,10 @@ run/main_scene="uid://rbaoav45ckjx"
 config/features=PackedStringArray("4.7", "Forward Plus")
 config/icon="res://icon.svg"
 
+[audio]
+
+buses/default_bus_layout="uid://cygyeg5bxekdb"
+
 [autoload]
 
 MCPRuntime="*uid://oqqkrb33oocp"
@@ -26,10 +30,6 @@ window/size/viewport_width=1920
 window/size/viewport_height=1080
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
-
-[editor_plugins]
-
-enabled=PackedStringArray("res://addons/godot_mcp/plugin.cfg")
 
 [file_customization]
 
