@@ -27,6 +27,8 @@ const DefeatScreenScript = preload("res://scripts/ui/defeat_screen.gd")
 
 var _cctv_overlay: CanvasLayer = null
 var _audio_player: AudioStreamPlayer3D = null
+var _door_audio_player: AudioStreamPlayer3D = null
+var _door_audio_tween: Tween = null
 var _tension_audio_player: AudioStreamPlayer = null
 var _final_music_player: AudioStreamPlayer = null
 var _final_music_tween: Tween = null
@@ -53,6 +55,7 @@ func _get_event_bus() -> Node:
 func _ready() -> void:
 	_resolve_scene_nodes()
 	_setup_audio_player()
+	_setup_door_audio_player()
 	_setup_cctv_overlay()
 	
 	var bus: Node = _get_event_bus()
@@ -112,6 +115,30 @@ func _setup_audio_player() -> void:
 		_audio_player.max_distance = 60.0
 		add_child(_audio_player)
 
+
+func _setup_door_audio_player() -> void:
+	var attach_target: Node = null
+	if door_node and door_node.is_inside_tree():
+		attach_target = door_node
+	elif door_pivot and door_pivot.is_inside_tree():
+		attach_target = door_pivot
+	elif is_inside_tree():
+		attach_target = self
+	else:
+		attach_target = door_node if door_node != null else (door_pivot if door_pivot != null else self)
+
+	if _door_audio_player == null:
+		_door_audio_player = AudioStreamPlayer3D.new()
+		_door_audio_player.name = "DoorAudioPlayer"
+		_door_audio_player.bus = &"Sound"
+		_door_audio_player.unit_size = 20.0
+		_door_audio_player.max_distance = 60.0
+		attach_target.add_child(_door_audio_player)
+	elif _door_audio_player.get_parent() == null:
+		attach_target.add_child(_door_audio_player)
+	elif _door_audio_player.get_parent() != attach_target and attach_target != self:
+		_door_audio_player.reparent(attach_target)
+
 func _play_audio(stream: AudioStream, vol_db: float, pos: Vector3 = Vector3.ZERO) -> void:
 	if not is_inside_tree():
 		return
@@ -156,6 +183,8 @@ func _play_black_victory() -> void:
 	if player_node:
 		player_node.can_walk = false
 		player_node.can_move = false
+		if "is_defeat_locked" in player_node:
+			player_node.is_defeat_locked = true
 		
 	# 1. Находим белого короля на доске
 	var white_king_node: Node3D = null
@@ -319,25 +348,28 @@ func _restore_scene_under_black_screen(is_defeat: bool = true) -> void:
 		var pt: int = bus.current_playthrough if bus else 2
 		chess_board_view.restart_game(pt)
 		
-	# 4. Вывод игрока из режима доски и выравнивание камеры
+	# 4. Вывод игрока из режима доски и возврат на стартовую точку
 	if player_node:
-		if "is_board_mode" in player_node and player_node.is_board_mode:
-			if player_node.has_method("exit_board_mode"):
-				player_node.exit_board_mode()
-			else:
-				player_node.is_board_mode = false
+		if player_node.has_method("reset_to_start"):
+			player_node.reset_to_start()
+		else:
+			if "is_board_mode" in player_node and player_node.is_board_mode:
+				if player_node.has_method("exit_board_mode"):
+					player_node.exit_board_mode()
+				else:
+					player_node.is_board_mode = false
+					
+			var cam = player_node.get_node_or_null("head/Camera3D") as Camera3D
+			if cam:
+				cam.h_offset = 0.0
+				cam.v_offset = 0.0
+				cam.position.y = -0.89668
+				cam.rotation_degrees.z = 0.0
 				
-		var cam = player_node.get_node_or_null("head/Camera3D") as Camera3D
-		if cam:
-			cam.h_offset = 0.0
-			cam.v_offset = 0.0
-			cam.position.y = -0.89668
-			cam.rotation_degrees.z = 0.0
-			
-		var head_node = player_node.get_node_or_null("head") as Node3D
-		if head_node:
-			head_node.rotation.x = 0.0
-			
+			var head_node = player_node.get_node_or_null("head") as Node3D
+			if head_node:
+				head_node.rotation.x = 0.0
+				
 	if bus and bus.has_signal("camera_mode_changed"):
 		bus.camera_mode_changed.emit(false)
 
@@ -345,9 +377,12 @@ func _restore_scene_under_black_screen(is_defeat: bool = true) -> void:
 func _finalize_player_control_after_defeat() -> void:
 	_is_ending_active = false
 	if player_node:
-		player_node.can_walk = true
-		player_node.can_move = true
-		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		if player_node.has_method("unlock_after_defeat"):
+			player_node.unlock_after_defeat()
+		else:
+			player_node.can_walk = true
+			player_node.can_move = true
+			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 		
 	var bus: Node = _get_event_bus()
 	if bus and bus.has_signal("camera_mode_changed"):
@@ -411,16 +446,40 @@ func _turn_off_lights() -> void:
 
 func _play_white_victory() -> void:
 	_is_ending_active = true
+	var bus: Node = _get_event_bus()
+	if bus and bus.has_signal("white_victory_door_opened"):
+		bus.white_victory_door_opened.emit()
+	if bus and bus.has_signal("ending_sequence_started"):
+		bus.ending_sequence_started.emit("white")
+		
 	if security_camera:
 		if security_camera.has_method("toggle_follow"):
 			security_camera.toggle_follow(true)
-		if security_camera.has_method("stop_camera_sound"):
+		if security_camera.has_method("fade_out_camera_sound"):
+			security_camera.fade_out_camera_sound(2.0)
+		elif security_camera.has_method("stop_camera_sound"):
 			security_camera.stop_camera_sound()
 	_setup_audio_player()
-	# 1. Тяжелый звук открывания гермозамков
-	var knock_sfx = preload("res://assets/sounds/door_open.ogg")
-	var door_pos: Vector3 = door_node.global_position if (door_node and door_node.is_inside_tree()) else Vector3(16, 2, 0)
-	_play_audio(knock_sfx, -5.0, door_pos)
+	# 1. Тяжелый звук открывания гермозамков и распахивания двери на выделенном плеере
+	var door_open_sfx = preload("res://assets/sounds/door_open.ogg")
+	_setup_door_audio_player()
+	if _door_audio_player:
+		if _door_audio_tween and _door_audio_tween.is_valid():
+			_door_audio_tween.kill()
+		_door_audio_player.stream = door_open_sfx
+		_door_audio_player.volume_db = -5.0
+		if _door_audio_player.is_inside_tree():
+			_door_audio_player.play()
+		
+		# Плавное затухание громкости в конце движения двери (последние 0.9с) до -40 dB
+		if is_inside_tree():
+			_door_audio_tween = create_tween()
+			_door_audio_tween.tween_interval(2.9)
+			_door_audio_tween.tween_property(_door_audio_player, "volume_db", -40.0, 0.9).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+			_door_audio_tween.tween_callback(func():
+				if _door_audio_player and _door_audio_player.stream == door_open_sfx:
+					_door_audio_player.stop()
+			)
 	
 	# 2. Плавное распахивание тяжелой двери бункера
 	var target_door = door_pivot if door_pivot else door_node
@@ -450,35 +509,44 @@ func _on_secret_room_body_entered(body: Node3D) -> void:
 	if not body.is_in_group("player"):
 		return
 		
+	var bus: Node = _get_event_bus()
+	if bus and bus.has_signal("secret_room_entered"):
+		bus.secret_room_entered.emit()
+
 	# Отключаем триггер, чтобы не срабатывал повторно
 	if observation_room:
 		var trigger = observation_room.get_node_or_null("EntryTrigger") as Area3D
 		if trigger:
 			trigger.set_deferred("monitoring", false)
 			
-	# 1. Дверь ЗАХЛОПЫВАЕТСЯ со страшным грохотом!
-	var slam_sfx = preload("res://assets/sounds/door_closed.ogg")
-	var door_pos: Vector3 = door_node.global_position if (door_node and door_node.is_inside_tree()) else Vector3(16, 2, 0)
-	_play_audio(slam_sfx, 12.0, door_pos)
-	
+	# Плавно затушаем предыдущий звук открывания двери за 0.35с перед закрытием
+	if _door_audio_tween and _door_audio_tween.is_valid():
+		_door_audio_tween.kill()
+	if _door_audio_player and (_door_audio_player.playing or _door_audio_player.stream != null):
+		if is_inside_tree():
+			_door_audio_tween = create_tween()
+			_door_audio_tween.tween_property(_door_audio_player, "volume_db", -40.0, 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+			_door_audio_tween.tween_callback(func():
+				if _door_audio_player and _door_audio_player.playing:
+					_door_audio_player.stop()
+			)
+		else:
+			_door_audio_player.volume_db = -40.0
+			_door_audio_player.stop()
+			
+	# 1. Плавное и кинематографичное закрытие двери бункера за спиной игрока
 	var target_door = door_pivot if door_pivot else door_node
+	var close_duration: float = 0.78
 	if target_door and is_inside_tree():
 		# Немедленно прерываем анимацию открытия двери, если она еще длится
 		if _door_tween and _door_tween.is_valid():
 			_door_tween.kill()
-		_door_tween = create_tween().set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
-		_door_tween.tween_property(target_door, "rotation_degrees:y", _initial_door_rot.y, 0.35)
+		_door_tween = create_tween().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+		_door_tween.tween_property(target_door, "rotation_degrees:y", _initial_door_rot.y, close_duration)
+		_door_tween.tween_callback(_on_secret_door_closed)
 	elif target_door:
 		target_door.rotation_degrees.y = _initial_door_rot.y
-		
-	# Блокируем обратный выход
-	if observation_room:
-		var blocker = observation_room.get_node_or_null("DoorBlocker") as StaticBody3D
-		if blocker:
-			blocker.collision_layer = 1
-			var col = blocker.get_node_or_null("CollisionShape3D") as CollisionShape3D
-			if col:
-				col.set_deferred("disabled", false)
+		_on_secret_door_closed()
 				
 	# 2. Активируем готовность терминала к вводу [E]
 	if observation_room:
@@ -490,6 +558,48 @@ func _on_secret_room_body_entered(body: Node3D) -> void:
 				monitor.revelation_finished.connect(_on_revelation_finished)
 			if monitor.has_method("enable_terminal_input"):
 				monitor.enable_terminal_input()
+
+## Завершение полного закрытия двери секретной комнаты: грохот, тряска камеры, блок выхода
+func _on_secret_door_closed() -> void:
+	# Грохот захлопнувшейся двери на выделенном 3D плеере двери
+	var slam_sfx = preload("res://assets/sounds/door_closed.ogg")
+	_setup_door_audio_player()
+	if _door_audio_player:
+		if _door_audio_tween and _door_audio_tween.is_valid():
+			_door_audio_tween.kill()
+		_door_audio_player.stream = slam_sfx
+		_door_audio_player.volume_db = 10.0
+		if _door_audio_player.is_inside_tree():
+			_door_audio_player.play()
+		
+		# Мягкое затухание хвоста звука захлопывания двери (длительность семпла 1.15с)
+		if is_inside_tree():
+			_door_audio_tween = create_tween()
+			_door_audio_tween.tween_interval(0.65)
+			_door_audio_tween.tween_property(_door_audio_player, "volume_db", -40.0, 0.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+			_door_audio_tween.tween_callback(func():
+				if _door_audio_player and _door_audio_player.stream == slam_sfx:
+					_door_audio_player.stop()
+			)
+		else:
+			_door_audio_player.volume_db = -40.0
+			_door_audio_player.stop()
+	
+	# Тряска экрана и подземный толчок
+	if player_node and player_node.has_method("apply_camera_shake"):
+		player_node.apply_camera_shake(0.65, 2.5, 0.08)
+	var bus: Node = _get_event_bus()
+	if bus and bus.has_signal("seismic_shock_triggered"):
+		bus.seismic_shock_triggered.emit(0.7, false)
+		
+	# Блокируем обратный выход ТОЛЬКО когда дверь полностью закрылась
+	if observation_room:
+		var blocker = observation_room.get_node_or_null("DoorBlocker") as StaticBody3D
+		if blocker:
+			blocker.collision_layer = 1
+			var col = blocker.get_node_or_null("CollisionShape3D") as CollisionShape3D
+			if col:
+				col.set_deferred("disabled", false)
 
 func _on_terminal_started() -> void:
 	# Финальная музыка (its end) с плавным нарастанием громкости после открытия терминала
@@ -621,6 +731,8 @@ func _play_draw_ending() -> void:
 		if player_node:
 			player_node.can_walk = false
 			player_node.can_move = false
+			if "is_defeat_locked" in player_node:
+				player_node.is_defeat_locked = true
 			var cam = player_node.get_node_or_null("head/Camera3D") as Camera3D
 			if cam:
 				var fall_tween = create_tween().set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
@@ -645,6 +757,10 @@ func restore_room_to_initial() -> void:
 		_final_music_player.stop()
 	if _final_music_tween and _final_music_tween.is_valid():
 		_final_music_tween.kill()
+	if _door_audio_tween and _door_audio_tween.is_valid():
+		_door_audio_tween.kill()
+	if _door_audio_player and _door_audio_player.playing:
+		_door_audio_player.stop()
 		
 	_cleanup_explosion_particles()
 	
@@ -674,7 +790,7 @@ func restore_room_to_initial() -> void:
 			spot.light_energy = 1.6
 			spot.spot_range = 28.0
 			
-	# 4. Закрытие двери
+	# 4. Закрытие двери и сброс секретной комнаты
 	var target_door = door_pivot if door_pivot else door_node
 	if target_door:
 		if _door_tween and _door_tween.is_valid():
@@ -682,17 +798,31 @@ func restore_room_to_initial() -> void:
 		target_door.rotation_degrees.y = _initial_door_rot.y
 		if _initial_door_pos != Vector3.ZERO:
 			target_door.position = _initial_door_pos
+			
+	if observation_room:
+		var blocker = observation_room.get_node_or_null("DoorBlocker") as StaticBody3D
+		if blocker:
+			blocker.collision_layer = 0
+			var col = blocker.get_node_or_null("CollisionShape3D") as CollisionShape3D
+			if col:
+				col.set_deferred("disabled", true)
+		var trigger = observation_room.get_node_or_null("EntryTrigger") as Area3D
+		if trigger:
+			trigger.set_deferred("monitoring", true)
 		
 	# 5. Возврат управления игроку
 	if player_node:
-		player_node.can_walk = true
-		player_node.can_move = true
-		var cam = player_node.get_node_or_null("head/Camera3D") as Camera3D
-		if cam:
-			cam.position.y = -0.89668
-			cam.rotation_degrees.z = 0.0
-			cam.h_offset = 0.0
-			cam.v_offset = 0.0
+		if player_node.has_method("reset_to_start"):
+			player_node.reset_to_start()
+		else:
+			player_node.can_walk = true
+			player_node.can_move = true
+			var cam = player_node.get_node_or_null("head/Camera3D") as Camera3D
+			if cam:
+				cam.position.y = -0.89668
+				cam.rotation_degrees.z = 0.0
+				cam.h_offset = 0.0
+				cam.v_offset = 0.0
 
 func _fade_and_reload(reason: String) -> void:
 	var bus: Node = _get_event_bus()

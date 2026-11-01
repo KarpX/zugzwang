@@ -32,7 +32,7 @@
 [ext_resource type="Script" uid="uid://b7mumlrfsu7kw" path="res://scripts/ui/restart_quote_overlay.gd" id="24_quote_ui"]
 [ext_resource type="Script" uid="uid://d4kpa5hi5gkf2" path="res://scripts/world/radio_controller.gd" id="25_radio_script"]
 [ext_resource type="AudioStream" uid="uid://g0bxlekgr45d" path="res://assets/sounds/voices/radio_sound.ogg" id="26_7r6do"]
-[ext_resource type="Script" path="res://scripts/ui/intro_disclaimer_overlay.gd" id="27_intro_ui"]
+[ext_resource type="Script" uid="uid://bdscn343llaoo" path="res://scripts/ui/intro_disclaimer_overlay.gd" id="27_intro_ui"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_wall_left"]
 size = Vector3(13.44, 13.5, 0.6)
@@ -443,7 +443,7 @@ audio_bus = &"Radio"
 [node name="DialGlow" type="OmniLight3D" parent="TableStatic/Table/Radio" unique_id=2089456124]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.7, 1, 0.65)
 light_color = Color(1, 0.82, 0.3, 1)
-light_energy = 0.8
+light_energy = 0.2
 omni_range = 1.2
 omni_attenuation = 1.8
 
@@ -505,5 +505,5 @@ script = ExtResource("22_ending")
 [node name="RestartQuoteOverlay" type="CanvasLayer" parent="." unique_id=1496681917]
 script = ExtResource("24_quote_ui")
 
-[node name="IntroDisclaimerOverlay" type="CanvasLayer" parent="."]
+[node name="IntroDisclaimerOverlay" type="CanvasLayer" parent="." unique_id=1030233232]
 script = ExtResource("27_intro_ui")

@@ -489,6 +489,19 @@ func has_any_legal_moves(is_white: bool) -> bool:
 					return true
 	return false
 
+## Получение всех легальных ходов для стороны (каждый ход в виде {"from": Vector2i, "to": Vector2i})
+func get_all_legal_moves(is_white: bool) -> Array[Dictionary]:
+	var all_moves: Array[Dictionary] = []
+	for x in range(BOARD_SIZE):
+		for y in range(BOARD_SIZE):
+			var piece = grid[x][y]
+			if piece != null and piece["is_white"] == is_white:
+				var from_pos: Vector2i = Vector2i(x, y)
+				var moves: Array[Vector2i] = get_legal_moves(from_pos)
+				for to_pos in moves:
+					all_moves.append({"from": from_pos, "to": to_pos})
+	return all_moves
+
 ## Интеллектуальный выбор хода движка ChessBot (на базе Prashanna135/chess с адаптивной сложностью)
 ## В 1-м прохождении: Hard, пожирание всех фигур белых перед матом
 ## Во 2-м прохождении: Medium, поддавки, жертвование фигур ради выживания короля

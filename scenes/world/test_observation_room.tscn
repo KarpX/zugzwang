@@ -1,4 +1,4 @@
-[gd_scene load_steps=3 format=3 uid="uid://testobsroom03"]
+[gd_scene format=3 uid="uid://dw6db24rfu4y1"]
 
 [ext_resource type="PackedScene" uid="uid://c6y78m5xa1a3k" path="res://scenes/world/observation_room.tscn" id="1_obs"]
 

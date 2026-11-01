@@ -23,10 +23,12 @@ func _init() -> void:
 		
 	var knocks_received: Array[int] = []
 	var game_over_reason: String = ""
+	var random_move_requested: bool = false
 	
 	if bus:
 		bus.door_knock_triggered.connect(func(level: int): knocks_received.append(level))
 		bus.game_over.connect(func(winner: String): game_over_reason = winner)
+		bus.random_player_move_requested.connect(func(): random_move_requested = true)
 	
 	# Для быстрого тестирования задаем тестовые интервалы 0.1с
 	timer.knock_intervals = [0.1, 0.1, 0.1]
@@ -56,19 +58,22 @@ func _init() -> void:
 	assert(timer.current_knock_level == 0, "После хода фигуры уровень стука должен сброситься в 0")
 	print("[PASS] Тест 4: Перемещение фигуры корректно сбрасывает таймер и уровень стука")
 	
-	# 5. Доводим бездействие до 3-го стука и проигрыша (breach)
+	# 5. Доводим бездействие до 3-го стука: вместо проигрыша запрашивается случайный ход игрока и таймер сбрасывается
 	timer._process(0.12) # knock 1
 	assert(timer.current_knock_level == 1)
 	timer._process(0.12) # knock 2
 	assert(timer.current_knock_level == 2)
-	timer._process(0.12) # knock 3 -> breach
-	assert(timer.current_knock_level == 3, "Должен сработать 3-й уровень стука")
-	assert(timer.is_game_finished == true, "Игра должна быть завершена после 3-го стука")
+	timer._process(0.12) # knock 3 -> random_player_move_requested + reset_idle_timer
+	assert(timer.current_knock_level == 0, "После 3-го стука уровень стука должен сброситься в 0")
+	assert(timer.idle_time == 0.0, "После 3-го стука idle_time должен быть сброшен в 0.0")
+	assert(timer.is_game_finished == false, "Игра НЕ должна завершаться после 3-го стука")
+	assert(timer.is_active == true, "Таймер должен оставаться активным")
 	
 	if bus:
 		assert(knocks_received.has(3), "EventBus должен получить door_knock_triggered(3)")
-		assert(game_over_reason == "breach", "Причина окончания игры должна быть 'breach'")
-	print("[PASS] Тест 5: 3-й стук knock3 завершает игру проигрышем 'breach'")
+		assert(random_move_requested == true, "EventBus должен получить random_player_move_requested")
+		assert(game_over_reason == "", "game_over не должен вызываться")
+	print("[PASS] Тест 5: 3-й стук knock3 запрашивает случайный ход игрока и сбрасывает таймер без поражения")
 	
 	# Возвращаем стандартные 30-секундные интервалы
 	timer.knock_intervals = [30.0, 30.0, 30.0]

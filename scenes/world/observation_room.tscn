@@ -194,7 +194,7 @@ max_distance = 8.0
 bus = &"Ambient"
 
 [node name="EntryTrigger" type="Area3D" parent="." unique_id=458047154]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 2, -2.5)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 2, -2.1559563)
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="EntryTrigger" unique_id=1537122101]
 shape = SubResource("BoxShape3D_trigger")

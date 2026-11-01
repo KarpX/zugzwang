@@ -137,11 +137,17 @@ func _ready() -> void:
 		bus.lamp_trouble_finished.connect(_on_lamp_trouble_finished)
 	if bus and bus.has_signal("seismic_shock_triggered"):
 		bus.seismic_shock_triggered.connect(_on_seismic_shock_triggered)
+	if bus and bus.has_signal("game_over"):
+		bus.game_over.connect(_on_game_over)
 	if bus and bus.has_signal("game_reset"):
 		bus.game_reset.connect(func(pt: int):
 			if logic:
 				logic.playthrough = pt
 		)
+	if bus and bus.has_signal("random_player_move_requested"):
+		bus.random_player_move_requested.connect(_on_random_player_move_requested)
+	if bus and bus.has_signal("radio_transmission_finished"):
+		bus.radio_transmission_finished.connect(_on_radio_transmission_finished)
 
 func _init_submodules() -> void:
 	audio_controller = ChessAudioController.new()
@@ -194,7 +200,9 @@ func _process(delta: float) -> void:
 			_start_precomputing_ai_move()
 
 	# 3. Watchdog таймер: если на ходе черных бот думает дольше 4.5 секунд — восстанавливаем ход
-	if logic != null and not logic.is_game_over and not logic.is_white_turn:
+	var bus = _get_event_bus()
+	var is_radio_busy: bool = (bus != null and bus.get("is_radio_text_visible") == true)
+	if logic != null and not logic.is_game_over and not logic.is_white_turn and not is_radio_busy:
 		_black_turn_timer += delta
 		if _black_turn_timer > 4.5:
 			_recover_stuck_ai_turn()
@@ -296,6 +304,14 @@ func _recover_stuck_ai_turn() -> void:
 # 	if bus:
 # 		bus.game_over.emit("draw")
 # 	_update_debug_hud()
+
+func _on_game_over(winner: String) -> void:
+	if logic != null:
+		logic.is_game_over = true
+		logic.winner = winner
+	clear_selection()
+	_clear_highlights()
+	is_ai_thinking = false
 
 func _init_materials() -> void:
 	white_mat = preload("res://assets/obj/chess/chess_white_material.tres")
@@ -492,16 +508,14 @@ func _on_camera_mode_changed(is_board_mode: bool) -> void:
 	if not is_active:
 		clear_selection()
 
-## Проверка, активен ли какой-либо эффект (перебой со светом, блэкаут, полет фигуры игрока, окно превращения)
+## Проверка, активен ли какой-либо блокирующий эффект ввода (полет фигуры игрока, окно превращения, активный текст радио)
 func is_effect_active() -> bool:
-	if _is_light_trouble_active:
-		return true
-	var bus = _get_event_bus()
-	if bus != null and bus.get("is_lamp_trouble_active") == true:
-		return true
 	if _is_white_moving:
 		return true
 	if promotion_dialog != null and promotion_dialog.is_open():
+		return true
+	var bus = _get_event_bus()
+	if bus and bus.get("is_radio_text_visible") == true:
 		return true
 	return false
 
@@ -512,7 +526,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 		return
 
-	if not is_active or is_ai_thinking or logic.is_game_over or is_effect_active():
+	var bus = _get_event_bus()
+	if (bus and bus.is_game_finished) or not is_active or is_ai_thinking or logic.is_game_over or is_effect_active():
 		return
 		
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
@@ -521,7 +536,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		cancel_selection()
 
 func _handle_board_click() -> void:
-	if not is_active or is_ai_thinking or logic.is_game_over or is_effect_active() or not logic.is_white_turn:
+	var bus = _get_event_bus()
+	if (bus and bus.is_game_finished) or not is_active or is_ai_thinking or logic.is_game_over or is_effect_active() or not logic.is_white_turn:
 		return
 
 	var viewport = get_viewport()
@@ -553,7 +569,8 @@ func _handle_board_click() -> void:
 	_on_cell_clicked(cell)
 
 func _on_cell_clicked(cell: Vector2i) -> void:
-	if not is_active or is_ai_thinking or logic.is_game_over or is_effect_active() or not logic.is_white_turn:
+	var bus = _get_event_bus()
+	if (bus and bus.is_game_finished) or not is_active or is_ai_thinking or logic.is_game_over or is_effect_active() or not logic.is_white_turn:
 		return
 
 	var piece_data = logic.get_piece(cell)
@@ -734,12 +751,21 @@ func _check_execute_ai_turn() -> void:
 		is_ai_thinking = false
 		return
 		
+	var bus = _get_event_bus()
+	if bus and bus.get("is_radio_text_visible") == true:
+		return
+		
 	var move_to_play: Dictionary = _precomputed_ai_move
 	_precomputed_ai_move = {}
 	_white_animation_finished = false
 	_ai_turn_delay_finished = false
 	
 	_execute_ai_turn(move_to_play)
+
+## Обработчик окончания радиоэфира: если черные ожидали завершения текста радио, совершаем ход
+func _on_radio_transmission_finished() -> void:
+	if logic != null and not logic.is_white_turn and not logic.is_game_over:
+		_check_execute_ai_turn()
 
 ## Выполнение хода игрока
 func _execute_player_move(from_pos: Vector2i, to_pos: Vector2i) -> void:
@@ -871,28 +897,37 @@ func _execute_player_move(from_pos: Vector2i, to_pos: Vector2i) -> void:
 		bus.piece_moved.emit(from_pos, to_pos)
 		bus.player_made_action.emit()
 
+func _on_random_player_move_requested() -> void:
+	make_random_player_move()
+
+## Выполнение случайного легального хода за белых (игрока), например при 3-м стуке в дверь
+func make_random_player_move() -> bool:
+	if logic == null or logic.is_game_over or not logic.is_white_turn:
+		return false
+	var bus = _get_event_bus()
+	if bus and bus.is_game_finished:
+		return false
+	if bus and bus.get("is_radio_text_visible") == true:
+		return false
+		
+	var moves: Array[Dictionary] = logic.get_all_legal_moves(true)
+	if moves.is_empty():
+		return false
+		
+	var chosen_move: Dictionary = moves[randi() % moves.size()]
+	if selected_pos != Vector2i(-1, -1):
+		cancel_selection()
+		
+	_execute_player_move(chosen_move["from"], chosen_move["to"])
+	return true
+
 ## Ход ИИ войны (использует предрассчитанный ход ai_move)
 func _execute_ai_turn(ai_move: Dictionary = {}) -> void:
 	if logic == null or logic.is_game_over or not is_inside_tree():
 		is_ai_thinking = false
 		return
 
-	# Блокировка: пока проигрывается анимация перебоя со светом, противник не может сделать ход
 	var bus = _get_event_bus()
-	var is_trouble: bool = _is_light_trouble_active
-	if bus and bus.get("is_lamp_trouble_active") == true:
-		is_trouble = true
-	if is_trouble:
-		_pending_ai_move_during_trouble = ai_move
-		is_ai_thinking = true
-		get_tree().create_timer(2.6).timeout.connect(func():
-			if _is_light_trouble_active or (bus and bus.get("is_lamp_trouble_active") == true):
-				_is_light_trouble_active = false
-				if bus:
-					bus.set("is_lamp_trouble_active", false)
-				_on_lamp_trouble_finished()
-		, CONNECT_ONE_SHOT)
-		return
 		
 	if ai_move.is_empty():
 		ai_move = logic.get_best_ai_move()
@@ -1129,22 +1164,22 @@ func _stop_enemy_move_sound() -> void:
 ## Синхронизация подсветки доски с перебоем света подвесной лампы
 func _on_lamp_flicker_triggered(sound_idx: int, _duration: float) -> void:
 	_is_light_trouble_active = true
-	clear_selection()
 	if light_controller != null:
 		light_controller.play_flicker(sound_idx, self)
 
-## Окончание перебоя со светом: восстановление подсветки и возобновление хода ИИ
+## Окончание перебоя со светом: восстановление подсветки
 func _on_lamp_trouble_finished() -> void:
 	_is_light_trouble_active = false
 	if light_controller != null:
 		light_controller.reset_light()
 	if is_ai_thinking and not logic.is_game_over and not logic.is_white_turn:
-		var move_to_resume: Dictionary = _pending_ai_move_during_trouble
-		_pending_ai_move_during_trouble = {}
-		var resume_timer = get_tree().create_timer(0.35)
-		resume_timer.timeout.connect(func():
-			_execute_ai_turn(move_to_resume)
-		)
+		if not _pending_ai_move_during_trouble.is_empty():
+			var move_to_resume: Dictionary = _pending_ai_move_during_trouble
+			_pending_ai_move_during_trouble = {}
+			var resume_timer = get_tree().create_timer(0.35)
+			resume_timer.timeout.connect(func():
+				_execute_ai_turn(move_to_resume)
+			)
 
 ## Подпрыгивание фигур на доске при подземном толчке (Слон, Ладья, Ферзь противника)
 func _on_seismic_shock_triggered(intensity: float, _is_subterranean: bool) -> void:

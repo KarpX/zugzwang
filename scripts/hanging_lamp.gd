@@ -64,6 +64,7 @@ var _glow_material: StandardMaterial3D = null
 var _trouble_tween: Tween = null
 var _ambient_tween: Tween = null
 var _amplitude_tween: Tween = null
+var _squeak_fade_tween: Tween = null
 var _stage4_pulse_tween: Tween = null
 var _stage3_timer: SceneTreeTimer = null
 var _default_light_color: Color = Color(1, 0.9411765, 0.6627451, 1)
@@ -175,14 +176,41 @@ func _ready() -> void:
 	else:
 		_on_escalation_stage_changed(1, 0)
 
+## Плавное затухание звука скрипа лампы до тишины (-45 dB) с последующей остановкой
+func fade_out_squeak(fade_duration: float = 1.2) -> void:
+	if _squeak_audio_player == null:
+		return
+	if not _squeak_audio_player.playing:
+		return
+	if _squeak_fade_tween and _squeak_fade_tween.is_valid():
+		_squeak_fade_tween.kill()
+
+	if fade_duration <= 0.0:
+		_squeak_audio_player.stop()
+		_squeak_audio_player.volume_db = squeak_base_volume_db
+		return
+
+	_squeak_fade_tween = create_tween().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_squeak_fade_tween.tween_property(_squeak_audio_player, "volume_db", -45.0, fade_duration)
+	_squeak_fade_tween.tween_callback(func():
+		if _squeak_audio_player and not is_swinging:
+			_squeak_audio_player.stop()
+			_squeak_audio_player.volume_db = squeak_base_volume_db
+	)
+
 func _process(delta: float) -> void:
 	if not is_swinging:
 		if _squeak_audio_player and _squeak_audio_player.playing:
-			_squeak_audio_player.stop()
+			if _squeak_fade_tween == null or not _squeak_fade_tween.is_valid():
+				fade_out_squeak(1.2)
 		return
-		
+
 	# Запуск воспроизведения скрипа, если раскачивание активно
 	if _squeak_audio_player and not _squeak_audio_player.playing:
+		if _squeak_fade_tween and _squeak_fade_tween.is_valid():
+			_squeak_fade_tween.kill()
+			_squeak_fade_tween = null
+		_squeak_audio_player.volume_db = squeak_base_volume_db
 		_squeak_audio_player.play()
 
 	_time += delta * swing_speed
@@ -209,26 +237,39 @@ func _process(delta: float) -> void:
 	rotation.x = x_swing
 
 	# Модуляция громкости скрипа в зависимости от силы покачивания лампы
-	if _squeak_audio_player:
+	if _squeak_audio_player and (_squeak_fade_tween == null or not _squeak_fade_tween.is_valid()):
 		var current_amp: float = maxf(absf(z_swing), absf(x_swing))
-		var impulse_factor: float = clampf((current_amp - DEFAULT_BASE_AMPLITUDE) / 0.25, 0.0, 1.0)
-		_squeak_audio_player.volume_db = lerpf(squeak_base_volume_db, squeak_max_volume_db, impulse_factor)
+		if current_amp >= DEFAULT_BASE_AMPLITUDE:
+			var impulse_factor: float = clampf((current_amp - DEFAULT_BASE_AMPLITUDE) / 0.25, 0.0, 1.0)
+			_squeak_audio_player.volume_db = lerpf(squeak_base_volume_db, squeak_max_volume_db, impulse_factor)
+		else:
+			# Плавный спад громкости от squeak_base_volume_db (-14 dB) к тишине (-45 dB) при затухании амплитуды маятника к 0
+			var fade_ratio: float = clampf(current_amp / DEFAULT_BASE_AMPLITUDE, 0.0, 1.0) if DEFAULT_BASE_AMPLITUDE > 0.0 else 0.0
+			_squeak_audio_player.volume_db = lerpf(-45.0, squeak_base_volume_db, fade_ratio)
 
 ## Функция для передачи импульса лампе (например, когда игрок задел лампу или при вспышке)
 func push(impulse_x: float, impulse_z: float) -> void:
+	if _squeak_fade_tween and _squeak_fade_tween.is_valid():
+		_squeak_fade_tween.kill()
+		_squeak_fade_tween = null
 	_impulse_angle_x += impulse_x
 	_impulse_angle_z += impulse_z
 	is_swinging = true
 	if _squeak_audio_player and not _squeak_audio_player.playing:
+		_squeak_audio_player.volume_db = squeak_base_volume_db
 		_squeak_audio_player.play()
 
 ## Увеличение амплитуды качания лампы с эффектом реалистичного толчка и плавным затуханием
 func trigger_amplitude_burst(target_amplitude: float, decay_duration: float = 6.5, push_duration: float = 0.60) -> void:
 	if _amplitude_tween and _amplitude_tween.is_valid():
 		_amplitude_tween.kill()
+	if _squeak_fade_tween and _squeak_fade_tween.is_valid():
+		_squeak_fade_tween.kill()
+		_squeak_fade_tween = null
 	target_burst_amplitude = target_amplitude
 	is_swinging = true
 	if _squeak_audio_player and not _squeak_audio_player.playing:
+		_squeak_audio_player.volume_db = squeak_base_volume_db
 		_squeak_audio_player.play()
 		
 	var target_idle: float = DEFAULT_BASE_AMPLITUDE if current_stage >= 2 else 0.0
@@ -245,28 +286,38 @@ func trigger_amplitude_burst(target_amplitude: float, decay_duration: float = 6.
 			is_swinging = false
 			base_amplitude = 0.0
 			rotation = Vector3.ZERO
-			if _squeak_audio_player and _squeak_audio_player.playing:
-				_squeak_audio_player.stop()
+			fade_out_squeak(1.2)
 	)
 
 ## Запуск фонового качания и скрипа (со 2 стадии тревоги)
 func start_ambient_swinging() -> void:
+	if _squeak_fade_tween and _squeak_fade_tween.is_valid():
+		_squeak_fade_tween.kill()
+		_squeak_fade_tween = null
 	is_swinging = true
 	if _squeak_audio_player and not _squeak_audio_player.playing:
+		_squeak_audio_player.volume_db = squeak_base_volume_db
 		_squeak_audio_player.play()
 	if _amplitude_tween == null or not _amplitude_tween.is_valid():
 		_amplitude_tween = create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 		_amplitude_tween.tween_property(self, "base_amplitude", DEFAULT_BASE_AMPLITUDE, 2.0)
 
 ## Остановка фонового качания и скрипа
-func stop_ambient_swinging() -> void:
+func stop_ambient_swinging(immediate: bool = false) -> void:
 	if _amplitude_tween and _amplitude_tween.is_valid():
 		_amplitude_tween.kill()
 	is_swinging = false
 	base_amplitude = 0.0
 	rotation = Vector3.ZERO
-	if _squeak_audio_player and _squeak_audio_player.playing:
-		_squeak_audio_player.stop()
+	if immediate:
+		if _squeak_fade_tween and _squeak_fade_tween.is_valid():
+			_squeak_fade_tween.kill()
+			_squeak_fade_tween = null
+		if _squeak_audio_player and _squeak_audio_player.playing:
+			_squeak_audio_player.stop()
+			_squeak_audio_player.volume_db = squeak_base_volume_db
+	else:
+		fade_out_squeak(1.2)
 
 func _on_escalation_stage_changed(stage: int, _total_losses: int) -> void:
 	current_stage = stage
@@ -278,8 +329,7 @@ func _on_escalation_stage_changed(stage: int, _total_losses: int) -> void:
 			is_swinging = false
 			base_amplitude = 0.0
 			rotation = Vector3.ZERO
-			if _squeak_audio_player and _squeak_audio_player.playing:
-				_squeak_audio_player.stop()
+			fade_out_squeak(1.2)
 		2:
 			_stop_stage3_flickers()
 			_stop_stage4_red_pulse()
@@ -300,7 +350,7 @@ func _on_game_reset(_playthrough: int = 1) -> void:
 	_stop_stage3_flickers()
 	_stop_stage4_red_pulse()
 	_restore_default_lighting()
-	stop_ambient_swinging()
+	stop_ambient_swinging(true)
 
 ## Запуск периодического пропадания света на 3 стадии (раз в 15-45 сек)
 func _start_stage3_flickers() -> void:

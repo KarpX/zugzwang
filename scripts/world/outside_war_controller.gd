@@ -71,7 +71,11 @@ var _sound_uvb76_buzzer: AudioStreamWAV = null
 
 var _door_shake_tween: Tween = null
 var _delayed_shock_tween: Tween = null
+var _outside_fade_tween: Tween = null
 var _initial_door_pos: Vector3 = Vector3.ZERO
+var _base_siren_volume_db: float = 6.0
+var _base_ambient_volume_db: float = 0.0
+var _base_buzzer_volume_db: float = -10.0
 
 func _get_event_bus() -> Node:
 	if not is_inside_tree():
@@ -95,6 +99,8 @@ func _ready() -> void:
 			bus.game_reset.connect(_on_game_reset)
 		if bus.has_signal("game_over"):
 			bus.game_over.connect(_on_game_over)
+		if bus.has_signal("white_victory_door_opened"):
+			bus.white_victory_door_opened.connect(_on_white_victory_door_opened)
 		if bus.has_signal("collapse_sequence_started"):
 			bus.collapse_sequence_started.connect(_on_collapse_sequence_started)
 			
@@ -190,6 +196,13 @@ func _setup_audio_players() -> void:
 			siren_player.max_distance = 200.0
 		if siren_player.volume_db < 0.0:
 			siren_player.volume_db = 6.0
+		_base_siren_volume_db = siren_player.volume_db
+
+	if outside_ambient_player:
+		_base_ambient_volume_db = outside_ambient_player.volume_db
+
+	if radio_buzzer_player:
+		_base_buzzer_volume_db = radio_buzzer_player.volume_db
 
 	if siren_player and not siren_player.finished.is_connected(_on_siren_finished):
 		siren_player.finished.connect(_on_siren_finished)
@@ -443,6 +456,7 @@ func _start_siren_loop() -> void:
 func _play_siren_instance() -> void:
 	if not _is_siren_loop_active or _siren_player == null:
 		return
+	_siren_player.volume_db = _base_siren_volume_db
 	_siren_player.stream = SOUND_SIREN
 	_siren_player.play()
 
@@ -510,15 +524,58 @@ func _shake_door(offset: float = 0.08, count: int = 5) -> void:
 		_door_shake_tween.tween_property(_door_node, "position", Vector3(shake_x, _initial_door_pos.y, shake_z), step_time)
 	_door_shake_tween.tween_property(_door_node, "position", _initial_door_pos, 0.06)
 
-func _on_game_over(_winner: String) -> void:
+## Плавное затухание всех наружных звуков (сирена, эмбиент, зуммер) перед остановкой
+func fade_out_all_outside_sounds(duration: float = 2.0) -> void:
 	_stop_stage4_bombardment()
-	_stop_siren_loop()
+	_is_siren_loop_active = false
+	_siren_delay_timer = null
+
+	if _outside_fade_tween and _outside_fade_tween.is_valid():
+		_outside_fade_tween.kill()
+
+	var active_players: Array[AudioStreamPlayer3D] = []
+	var all_players: Array[AudioStreamPlayer3D] = [
+		_siren_player,
+		_outside_ambient_player,
+		_radio_buzzer_player,
+		_outside_sfx_player,
+		_outside_sfx_player_near
+	]
+	for p in all_players:
+		if p and is_instance_valid(p) and p.playing:
+			active_players.append(p)
+
+	if active_players.is_empty():
+		return
+
+	_outside_fade_tween = create_tween().set_parallel(true).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	for p in active_players:
+		_outside_fade_tween.tween_property(p, "volume_db", -40.0, duration)
+
+	var stop_timer: SceneTreeTimer = get_tree().create_timer(duration)
+	stop_timer.timeout.connect(func():
+		for p in active_players:
+			if is_instance_valid(p) and p.playing:
+				p.stop()
+	)
+
+func _on_white_victory_door_opened() -> void:
+	fade_out_all_outside_sounds(2.0)
+
+func _on_game_over(winner: String) -> void:
+	_stop_stage4_bombardment()
+	if winner.to_lower() == "white":
+		fade_out_all_outside_sounds(2.0)
+	else:
+		_stop_siren_loop()
 
 func _on_collapse_sequence_started() -> void:
 	_stop_stage4_bombardment()
 	_stop_siren_loop()
 
 func _on_game_reset(_playthrough: int) -> void:
+	if _outside_fade_tween and _outside_fade_tween.is_valid():
+		_outside_fade_tween.kill()
 	_stop_siren_loop()
 	_stop_stage4_bombardment()
 	if _outside_sfx_player and _outside_sfx_player.playing:
@@ -527,7 +584,12 @@ func _on_game_reset(_playthrough: int) -> void:
 		_outside_sfx_player_near.stop()
 	if _outside_ambient_player:
 		_outside_ambient_player.stop()
+		_outside_ambient_player.volume_db = _base_ambient_volume_db
 	if _radio_buzzer_player:
 		_radio_buzzer_player.stop()
+		_radio_buzzer_player.volume_db = _base_buzzer_volume_db
+	if _siren_player:
+		_siren_player.stop()
+		_siren_player.volume_db = _base_siren_volume_db
 	if _door_node and _initial_door_pos != Vector3.ZERO:
 		_door_node.position = _initial_door_pos

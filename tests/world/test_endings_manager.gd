@@ -20,6 +20,7 @@ func _init() -> void:
 	test_black_victory_defeat_screen_abrupt_and_scene_restoration()
 	test_camera_sound_stopped_and_premature_door_slam()
 	test_terminal_proximity_and_gaze()
+	test_door_audio_fade_and_player()
 	print("--- [PASS] ВСЕ ТЕСТЫ КОНЦОВОК УСПЕШНО ПРОЙДЕНЫ! ---")
 	quit(0)
 
@@ -309,7 +310,14 @@ func test_black_victory_defeat_screen_abrupt_and_scene_restoration() -> void:
 	var steps = AudioStreamPlayer3D.new()
 	steps.name = "PlayerSteps"
 	player.add_child(steps)
+	player.position = Vector3(16.0, 5.185, 3.5)
 	root_node.add_child(player)
+	
+	# Запоминаем исходную стартовую позицию
+	var start_pos = player.global_position
+	
+	# Игрок подходит к столу и садится
+	player.global_position = Vector3(16.0, 5.185, 17.5)
 	player.enter_board_mode()
 	player.is_board_mode = true
 	player.can_walk = false
@@ -339,6 +347,16 @@ func test_black_victory_defeat_screen_abrupt_and_scene_restoration() -> void:
 	manager.door_pivot = door_pivot
 	manager.hanging_bulb = bulb
 	root_node.add_child(manager)
+	
+	# Имитируем поражение (черные выиграли)
+	player._on_game_over("black")
+	assert(player.is_defeat_locked == true, "При поражении игрок должен быть заблокирован (is_defeat_locked)")
+	assert(player.can_walk == false, "При поражении игрок не может ходить")
+	assert(player.can_move == false, "При поражении игрок не может вращать камеру")
+	
+	# Попытка встать из-за стола во время поражения должна блокироваться
+	player.exit_board_mode()
+	assert(player.is_board_mode == true, "При поражении игрок не может выйти из-за стола")
 	
 	# 1. Проверяем нагнетающий звук перед черным экраном
 	var tension_finished_called: bool = false
@@ -378,6 +396,7 @@ func test_black_victory_defeat_screen_abrupt_and_scene_restoration() -> void:
 	assert(bus.current_playthrough >= 2, "Сложность игры должна быть увеличена")
 	assert(bus.current_stage == 1, "Стадия бункера должна сброситься на 1")
 	assert(player.is_board_mode == false, "Игрок должен выйти из режима доски")
+	assert(player.global_position.distance_to(start_pos) < 0.01, "Игрок должен вернуться на стартовую точку спавна")
 	
 	# Имитируем завершение экрана (дисмисс)
 	defeat_screen._dismiss_screen()
@@ -386,6 +405,7 @@ func test_black_victory_defeat_screen_abrupt_and_scene_restoration() -> void:
 	# Проверяем, что после исчезновения экрана игрок может двигаться
 	assert(player.can_walk == true, "После исчезновения черного экрана can_walk должен быть true")
 	assert(player.can_move == true, "После исчезновения черного экрана can_move должен быть true")
+	assert(player.is_defeat_locked == false, "Блокировка управления поражением должна быть снята")
 	assert(manager._is_ending_active == false, "_is_ending_active должен быть сброшен в false")
 	
 	defeat_screen.queue_free()
@@ -485,3 +505,57 @@ func test_terminal_proximity_and_gaze() -> void:
 	player.queue_free()
 	monitor.queue_free()
 	print("✓ Тест 10 пройден")
+
+func test_door_audio_fade_and_player() -> void:
+	print("Тест 11: Плавное затухание звуков двери и выделенный 3D плеер...")
+	var root_node = get_root()
+	var manager = EndingManagerScript.new()
+	root_node.add_child(manager)
+	
+	var door_pivot = Node3D.new()
+	door_pivot.name = "DoorPivot"
+	root_node.add_child(door_pivot)
+	manager.door_pivot = door_pivot
+	
+	var door = Node3D.new()
+	door.name = "Door"
+	door_pivot.add_child(door)
+	manager.door_node = door
+	
+	# 1. Проверяем инициализацию и прикрепление _door_audio_player к door_node
+	manager._setup_door_audio_player()
+	assert(manager._door_audio_player != null, "Плеер двери _door_audio_player должен быть создан")
+	assert(manager._door_audio_player.get_parent() == door, "_door_audio_player должен быть прикреплен к door_node")
+	assert(manager._door_audio_player.bus == &"Sound", "_door_audio_player должен использовать Sound шину")
+	
+	# 2. Победа белых: проверяем запуск door_open.ogg на _door_audio_player
+	manager._play_white_victory()
+	assert(manager._door_audio_player.stream != null, "Стрим звука открывания должен быть назначен")
+	assert(manager._door_audio_player.stream.resource_path.ends_with("door_open.ogg"), "Должен воспроизводиться door_open.ogg")
+	assert(manager._door_audio_player.volume_db == -5.0, "Громкость старта должна быть -5.0 dB")
+	
+	# 3. Вход в секретную комнату: звук открывания должен затухать перед закрытием
+	var fake_player = CharacterBody3D.new()
+	fake_player.add_to_group("player")
+	root_node.add_child(fake_player)
+	
+	manager._on_secret_room_body_entered(fake_player)
+	assert(manager._door_audio_player.volume_db <= -40.0, "Звук открывания должен быть затушен перед звуком закрытия")
+	
+	# 4. Захлопывание двери: проверяем запуск door_closed.ogg и мягкое затухание
+	manager._on_secret_door_closed()
+	assert(manager._door_audio_player.stream != null, "Стрим звука закрытия должен быть назначен")
+	assert(manager._door_audio_player.stream.resource_path.ends_with("door_closed.ogg"), "Должен воспроизводиться door_closed.ogg")
+	assert(manager._door_audio_player.volume_db <= -40.0, "Звук захлопывания должен быть мягко затушен")
+	
+	# 5. Сброс комнаты: плеер двери должен быть остановлен, а tween уничтожен
+	manager.restore_room_to_initial()
+	assert(manager._door_audio_player.playing == false, "Плеер двери должен быть остановлен")
+	assert(manager._door_audio_tween == null or not manager._door_audio_tween.is_valid(), "Tween двери должен быть аннулирован")
+	
+	fake_player.queue_free()
+	door.queue_free()
+	door_pivot.queue_free()
+	manager.queue_free()
+	print("✓ Тест 11 пройден")
+
