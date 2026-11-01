@@ -13,6 +13,7 @@ extends Node3D
 const ChessLogicScript = preload("res://scripts/chess/chess_logic.gd")
 const ChessPiece3DScript = preload("res://scripts/chess/chess_piece_3d.gd")
 const ChessBotScript = preload("res://scripts/chess/chess_bot.gd")
+const VoxelBloodStainScript = preload("res://scripts/chess/voxel_blood_stain.gd")
 
 const ChessAudioController = preload("res://scripts/chess/view/chess_audio_controller.gd")
 const ChessBloodManager = preload("res://scripts/chess/view/chess_blood_manager.gd")
@@ -118,13 +119,16 @@ func _ready() -> void:
 	_init_meshes()
 	
 	logic = ChessLogicScript.new()
+	var bus = _get_event_bus()
+	if bus and "current_playthrough" in bus and bus.current_playthrough > 1:
+		logic.playthrough = bus.current_playthrough
+		
 	ChessBotScript._init_zobrist()
 	spawn_pieces()
 	debug_hud.setup(self)
 	_start_pondering()
 	
 	# Подписываемся на события шины
-	var bus = _get_event_bus()
 	if bus and bus.has_signal("camera_mode_changed"):
 		bus.camera_mode_changed.connect(_on_camera_mode_changed)
 	if bus and bus.has_signal("lamp_flicker_triggered"):
@@ -133,6 +137,11 @@ func _ready() -> void:
 		bus.lamp_trouble_finished.connect(_on_lamp_trouble_finished)
 	if bus and bus.has_signal("seismic_shock_triggered"):
 		bus.seismic_shock_triggered.connect(_on_seismic_shock_triggered)
+	if bus and bus.has_signal("game_reset"):
+		bus.game_reset.connect(func(pt: int):
+			if logic:
+				logic.playthrough = pt
+		)
 
 func _init_submodules() -> void:
 	audio_controller = ChessAudioController.new()
@@ -232,6 +241,57 @@ func _input(event: InputEvent) -> void:
 				_update_debug_hud()
 			KEY_F4:
 				toggle_debug_hud()
+			KEY_F5:
+				trigger_debug_win()
+			KEY_F6:
+				trigger_debug_loss()
+			KEY_F7:
+				trigger_debug_draw()
+
+## Отладочная моментальная победа Белых (Игрок)
+func trigger_debug_win() -> void:
+	if logic == null:
+		logic = ChessLogicScript.new()
+	logic.is_game_over = true
+	logic.winner = "white"
+	clear_selection()
+	_clear_highlights()
+	_cleanup_ai_thread()
+	is_ai_thinking = false
+	var bus = _get_event_bus()
+	if bus:
+		bus.game_over.emit("white")
+	_update_debug_hud()
+
+## Отладочное моментальное поражение Белых (Победа Чёрных)
+func trigger_debug_loss() -> void:
+	if logic == null:
+		logic = ChessLogicScript.new()
+	logic.is_game_over = true
+	logic.winner = "black"
+	clear_selection()
+	_clear_highlights()
+	_cleanup_ai_thread()
+	is_ai_thinking = false
+	var bus = _get_event_bus()
+	if bus:
+		bus.game_over.emit("black")
+	_update_debug_hud()
+
+## Отладочный моментальный пат (Ничья)
+func trigger_debug_draw() -> void:
+	if logic == null:
+		logic = ChessLogicScript.new()
+	logic.is_game_over = true
+	logic.winner = "draw"
+	clear_selection()
+	_clear_highlights()
+	_cleanup_ai_thread()
+	is_ai_thinking = false
+	var bus = _get_event_bus()
+	if bus:
+		bus.game_over.emit("draw")
+	_update_debug_hud()
 
 func _init_materials() -> void:
 	white_mat = preload("res://assets/obj/chess/chess_white_material.tres")
@@ -329,6 +389,9 @@ func _spawn_piece_at(pos: Vector2i, p_type: String, is_white: bool) -> ChessPiec
 ## Автоматический запуск перезапуска доски после мата с атмосферной задержкой
 func _trigger_checkmate_restart(delay: float = 2.5) -> void:
 	if _is_restarting:
+		return
+	# Если EndingManager присутствует в сцене, он управляет кинематографичным финалом и перезапуском
+	if is_inside_tree() and get_tree().get_nodes_in_group("ending_manager").size() > 0:
 		return
 	_is_restarting = true
 	var timer = get_tree().create_timer(delay)
@@ -996,6 +1059,30 @@ func spawn_blood_stain(cell: Vector2i) -> Node3D:
 		var local_pos = cell_to_local_pos(cell)
 		return blood_manager.spawn_blood_stain(cell, local_pos)
 	return null
+
+## Создание одной гигантской воксельной лужи крови от взрыва белого короля
+## Занимает саму клетку короля и ВСЕ соседние клетки вокруг (зона 3x3)
+func spawn_mega_blood_stain(cell: Vector2i) -> Node3D:
+	if blood_container == null:
+		blood_container = get_node_or_null("BloodStains")
+		if blood_container == null:
+			blood_container = Node3D.new()
+			blood_container.name = "BloodStains"
+			add_child(blood_container)
+			
+	# Помечаем в словаре blood_layers все 9 клеток (3x3), чтобы маркеры ходов/выбора учитывали слой
+	for dx in range(-1, 2):
+		for dy in range(-1, 2):
+			var target_c = Vector2i(cell.x + dx, cell.y + dy)
+			if target_c.x >= 0 and target_c.x < 8 and target_c.y >= 0 and target_c.y < 8:
+				var l_idx: int = blood_layers.get(target_c, 0)
+				blood_layers[target_c] = l_idx + 1
+				
+	var stain = VoxelBloodStainScript.new()
+	var local_cell_pos: Vector3 = cell_to_local_pos(cell)
+	blood_container.add_child(stain)
+	stain.create_mega_stain(local_cell_pos, 0, true)
+	return stain
 
 ## Очистка всех воксельных пятен крови (при сбросе доски / новой партии)
 func clear_blood_stains() -> void:

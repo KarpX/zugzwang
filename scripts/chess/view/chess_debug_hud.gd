@@ -129,6 +129,7 @@ func update(logic: RefCounted,
 	text += "Оценка ИИ: [color=#88ffaa]%.1f cp[/color] (глубина %d)\n" % [eval_score, search_depth]
 	text += "Бункер: Потери %d/16 | Стадия тревоги %d/4\n" % [losses, stage]
 	text += "[color=#445566]──────────────────────────────────[/color]\n"
-	text += "[color=#bbccdd][b][F1][/b] Матч 1 | [b][F2][/b] Матч 2 | [b][F3][/b] Скорость | [b][F4][/b] Скрыть[/color]"
+	text += "[color=#bbccdd][b][F1][/b] Матч 1 | [b][F2][/b] Матч 2 | [b][F3][/b] Скорость | [b][F4][/b] Скрыть[/color]\n"
+	text += "[color=#ffd700][b][F5][/b] Победа Белых | [b][F6][/b] Поражение (Чёрные) | [b][F7][/b] Пат[/color]"
 	
 	debug_hud_label.text = text

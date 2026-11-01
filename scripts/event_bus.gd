@@ -53,6 +53,11 @@ signal lamp_flicker_triggered(sound_index: int, duration: float)
 ## Завершение анимации перебоя со светом (свет полностью восстановлен)
 signal lamp_trouble_finished()
 
+## Сигналы финала и концовок
+signal ending_sequence_started(ending_type: String)
+signal white_victory_door_opened()
+signal secret_room_entered()
+
 
 # ==============================================================================
 # 3. ЭСКАЛАЦИЯ КОМНАТЫ (4 стадии разрушения)
@@ -83,7 +88,21 @@ signal door_light_flash(color: Color, duration: float, intensity: float)
 
 
 # ==============================================================================
-# 5. СОСТОЯНИЕ И СЧЕТЧИКИ (State Helpers)
+# 5. РАДИО И ГОЛОСОВОЙ ЭФИР (Radio & Voice Transmission)
+# ==============================================================================
+
+## Запрос на воспроизведение радио-сообщения (текст фразы, принадлежность белым/черным)
+signal radio_phrase_triggered(text: String, is_white: bool)
+
+## Старт радиоэфира с передачей фактической длительности аудиопотока для синхронизации
+signal radio_transmission_started(text: String, stream: AudioStream, duration: float)
+
+## Окончание радиопередачи голоса
+signal radio_transmission_finished()
+
+
+# ==============================================================================
+# 6. СОСТОЯНИЕ И СЧЕТЧИКИ (State Helpers)
 # ==============================================================================
 
 const PIECE_VALUES: Dictionary = {
@@ -105,6 +124,31 @@ var outside_stage: int = 0
 var is_in_board_mode: bool = false
 var is_game_finished: bool = false
 var is_lamp_trouble_active: bool = false
+
+# Persistent state across scene reloads
+var restart_quote: String = ""
+var death_count: int = 0
+var player_losses: int = 0
+var current_playthrough: int = 1
+
+const DEFEAT_QUOTES: Array[String] = [
+	"«Смерть не освобождает от службы. Расставь фигуры заново.»",
+	"«Ты помнишь каждый свой неверный шаг. Сделай следующий ход.»",
+	"«Партия не завершена, пока ты помнишь правила. Попробуй снова.»",
+	"«Каждый раз, когда ты падаешь, война начинается сначала.»",
+	"«Король пал. Но доска осталась на месте. Играй.»"
+]
+
+const DRAW_QUOTES: Array[String] = [
+	"«Война не принимает ничьих. Защищай короля до конца.»",
+	"«Пат — это не мир. Это приговор обоим. Начни сначала.»"
+]
+
+func get_random_defeat_quote() -> String:
+	return DEFEAT_QUOTES[randi() % DEFEAT_QUOTES.size()]
+
+func get_random_draw_quote() -> String:
+	return DRAW_QUOTES[randi() % DRAW_QUOTES.size()]
 
 func _ready() -> void:
 	# Подключаем внутренний учет потерь к сигналу взятия фигуры
@@ -169,7 +213,9 @@ func _on_game_over(_winner: String) -> void:
 		escalation_stage_changed.emit(current_stage, total_losses)
 
 ## Сброс состояния для перезапуска партии
-func reset_game_state(playthrough: int = 1) -> void:
+func reset_game_state(playthrough: int = -1) -> void:
+	if playthrough > 0:
+		current_playthrough = playthrough
 	total_losses = 0
 	white_losses = 0
 	black_losses = 0
@@ -178,5 +224,7 @@ func reset_game_state(playthrough: int = 1) -> void:
 	current_stage = 1
 	outside_stage = 0
 	is_game_finished = false
-	game_reset.emit(playthrough)
 	is_lamp_trouble_active = false
+	escalation_stage_changed.emit(1, 0)
+	outside_stage_changed.emit(0, 40)
+	game_reset.emit(current_playthrough)

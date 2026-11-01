@@ -466,8 +466,8 @@ static func choose_best_move(
 	var black_king_pos = find_king(board, false)
 	var in_check: bool = is_in_check(board, false)
 	
-	# Во 2-м прохождении бот плавно адаптируется к силе игрока
-	if playthrough == 2 and not in_check and scored_root_moves.size() > 1:
+	# Во 2-м и последующих прохождениях бот плавно адаптируется к силе игрока
+	if playthrough >= 2 and not in_check and scored_root_moves.size() > 1:
 		scored_root_moves.sort_custom(func(a, b): return a["score"] > b["score"])
 		var top_score: float = scored_root_moves[0]["score"]
 		var moved_count = ChessOpeningBook.count_moved_pieces(board)

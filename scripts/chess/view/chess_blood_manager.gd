@@ -39,6 +39,24 @@ func spawn_blood_stain(cell: Vector2i, local_cell_pos: Vector3) -> Node3D:
 	stain.create_stain(local_cell_pos, layer_idx, true)
 	return stain
 
+## Создание одной гигантской воксельной лужи крови от взрыва белого короля
+func spawn_mega_blood_stain(cell: Vector2i, local_cell_pos: Vector3) -> Node3D:
+	_ensure_container()
+	if blood_container == null:
+		return null
+		
+	for dx in range(-1, 2):
+		for dy in range(-1, 2):
+			var target_c = Vector2i(cell.x + dx, cell.y + dy)
+			if target_c.x >= 0 and target_c.x < 8 and target_c.y >= 0 and target_c.y < 8:
+				var l_idx: int = blood_layers.get(target_c, 0)
+				blood_layers[target_c] = l_idx + 1
+				
+	var stain = VoxelBloodStainScript.new()
+	blood_container.add_child(stain)
+	stain.create_mega_stain(local_cell_pos, 0, true)
+	return stain
+
 ## Получение текущего уровня накопления крови на клетке
 func get_blood_level(cell: Vector2i) -> int:
 	return blood_layers.get(cell, 0)
