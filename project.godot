@@ -21,7 +21,6 @@ buses/default_bus_layout="uid://cygyeg5bxekdb"
 
 [autoload]
 
-MCPRuntime="*uid://oqqkrb33oocp"
 EventBus="*res://scripts/event_bus.gd"
 
 [display]
@@ -30,6 +29,10 @@ window/size/viewport_width=1920
 window/size/viewport_height=1080
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/godot_mcp/plugin.cfg")
 
 [file_customization]
 

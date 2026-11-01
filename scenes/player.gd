@@ -8,9 +8,9 @@ extends CharacterBody3D
 @export_range(1.0, 15.0, 0.5) var queen_panic_duration: float = 3.5
 @export_range(0.5, 4.0, 0.25) var panic_fade_out_time: float = 1.5
 
-@onready var head: Node3D = $head
-@onready var camera: Camera3D = $head/Camera3D
-@onready var player_steps: AudioStreamPlayer3D = $PlayerSteps
+@onready var head: Node3D = get_node_or_null("head") as Node3D
+@onready var camera: Camera3D = get_node_or_null("head/Camera3D") as Camera3D
+@onready var player_steps: AudioStreamPlayer3D = get_node_or_null("PlayerSteps") as AudioStreamPlayer3D
 @onready var breath_player: AudioStreamPlayer3D = get_node_or_null("head/AudioStreamPlayer3D") as AudioStreamPlayer3D
 
 # Виньетка паники и тяжелое дыхание

@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" uid="uid://cxdlckkq165k8" path="res://scripts/world/observation_monitor.gd" id="1_monitor"]
 [ext_resource type="AudioStream" uid="uid://d35f8fhkj4urh" path="res://assets/sounds/bulb_ambient.ogg" id="2_ienag"]
-[ext_resource type="AudioStream" uid="uid://bl1ix3odo6k4e" path="res://assets/sounds/its end.ogg" id="2_v34ih"]
+[ext_resource type="AudioStream" uid="uid://cd8chirhgqe7o" path="res://assets/sounds/its end.ogg" id="2_v34ih"]
 [ext_resource type="ArrayMesh" uid="uid://b03ivq1yo3trn" path="res://assets/obj/pumpkin.obj" id="4_pumpkin_mesh"]
 [ext_resource type="Material" uid="uid://ey77ayl01iyy" path="res://assets/obj/pumpkin_material.tres" id="5_pumpkin_mat"]
 [ext_resource type="Script" uid="uid://bqywgl4msv4wk" path="res://scripts/world/pumpkin_flicker.gd" id="6_pumpkin_flicker"]

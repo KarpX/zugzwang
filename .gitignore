@@ -5,3 +5,4 @@ addons/godot_mcp/cache/
 .vscode/
 __pycache__/
 *.pyc
+*.exe

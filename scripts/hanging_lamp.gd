@@ -81,12 +81,14 @@ func _get_event_bus() -> Node:
 
 func _ready() -> void:
 	# 1. Локальная копия материала свечения колбы (чтобы не портить shared .tres на диске)
-	var mat = get_surface_override_material(1)
+	var mat: Material = null
+	if get_surface_override_material_count() > 1:
+		mat = get_surface_override_material(1)
 	if mat is StandardMaterial3D:
 		_glow_material = mat.duplicate() as StandardMaterial3D
 		set_surface_override_material(1, _glow_material)
 		base_glow_emission = _glow_material.emission_energy_multiplier
-	elif mesh != null:
+	elif mesh != null and mesh.get_surface_count() > 1:
 		var mesh_mat = mesh.surface_get_material(1)
 		if mesh_mat is StandardMaterial3D:
 			_glow_material = mesh_mat.duplicate() as StandardMaterial3D
