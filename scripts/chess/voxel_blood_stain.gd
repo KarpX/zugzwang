@@ -77,6 +77,70 @@ func create_stain(target_local_pos: Vector3, layer_index: int = 0, animate: bool
 		var sz: int = int(round(sin(splash_angle) * splash_dist))
 		occupied_voxels[Vector2i(sx, sz)] = 1
 		
+	_build_multimesh(occupied_voxels, MAX_RADIUS, layer_index)
+		
+	# 4. АНИМАЦИЯ: Взрывной всплеск лужи и разлетающиеся воксельные капли
+	if animate:
+		_animate_splash(target_local_pos)
+
+## Создание гигантской сплошной воксельной лужи крови от взрыва короля
+## Полностью покрывает клетку короля и ВСЕ соседние клетки вокруг (зона 3x3, диаметр ~1.75м)
+func create_mega_stain(target_local_pos: Vector3, layer_index: int = 0, animate: bool = true) -> void:
+	position = target_local_pos
+	
+	var occupied_voxels: Dictionary = {}
+	
+	# 1. ГИГАНТСКОЕ СПЛОШНОЕ ЯДРО ЛУЖИ (радиус ~23 вокселя = ~0.87м, диаметр ~1.75м, перекрывает 3x3 клетки)
+	var mega_core_radius: float = 23.0
+	for x in range(-24, 25):
+		for z in range(-24, 25):
+			var dist: float = sqrt(float(x * x + z * z))
+			# Органическая деформация формы (волнообразные края)
+			var angle: float = atan2(float(z), float(x))
+			var edge_noise: float = sin(angle * 5.0) * 1.2 + cos(angle * 3.0) * 0.8
+			if dist <= (mega_core_radius + edge_noise):
+				if dist <= 3.5:
+					occupied_voxels[Vector2i(x, z)] = 5 # Эпицентр детонации (самый густой слой)
+				elif dist <= 7.0:
+					occupied_voxels[Vector2i(x, z)] = 4
+				elif dist <= 13.0:
+					occupied_voxels[Vector2i(x, z)] = 3
+				elif dist <= 18.5:
+					occupied_voxels[Vector2i(x, z)] = 2
+				else:
+					occupied_voxels[Vector2i(x, z)] = 1
+					
+	# 2. РУКАВА И ЛОПАСТИ РАСТЕКАНИЯ (8-10 длинных рукавов, затекающих далеко в швы доски)
+	var lobe_count: int = randi_range(8, 11)
+	var base_rot: float = randf_range(0.0, TAU)
+	for lobe_idx in range(lobe_count):
+		var l_angle: float = base_rot + (float(lobe_idx) * (TAU / float(lobe_count))) + randf_range(-0.25, 0.25)
+		var lobe_len: int = randi_range(24, 29)
+		for step in range(20, lobe_len + 1):
+			var gx: int = int(round(cos(l_angle) * float(step)))
+			var gz: int = int(round(sin(l_angle) * float(step)))
+			var key: Vector2i = Vector2i(gx, gz)
+			occupied_voxels[key] = 1
+			if step <= 25:
+				var side_x: int = gx + (1 if randf() > 0.5 else -1)
+				occupied_voxels[Vector2i(side_x, gz)] = 1
+				
+	# 3. МАССИВНЫЕ БРЫЗГИ НА ДАЛЬНЕЙ ПЕРИФЕРИИ
+	var splash_count: int = randi_range(35, 55)
+	for s in range(splash_count):
+		var splash_angle: float = randf_range(0.0, TAU)
+		var splash_dist: float = randf_range(23.5, 30.0)
+		var sx: int = int(round(cos(splash_angle) * splash_dist))
+		var sz: int = int(round(sin(splash_angle) * splash_dist))
+		occupied_voxels[Vector2i(sx, sz)] = 1
+		
+	_build_multimesh(occupied_voxels, 0.92, layer_index)
+	
+	if animate:
+		_animate_mega_splash(target_local_pos)
+
+## Внутренняя сборка MultiMeshInstance3D из сетки вокселей
+func _build_multimesh(occupied_voxels: Dictionary, max_effective_radius: float, layer_index: int) -> void:
 	var total_count: int = occupied_voxels.size()
 	if total_count == 0:
 		return
@@ -108,7 +172,10 @@ func create_stain(target_local_pos: Vector3, layer_index: int = 0, animate: bool
 		
 		var voxel_h_scale: float = 1.0
 		var voxel_y_offset: float = 0.0
-		if height_level == 4:
+		if height_level == 5:
+			voxel_h_scale = 3.6
+			voxel_y_offset = box.size.y * 1.3
+		elif height_level == 4:
 			voxel_h_scale = 3.0
 			voxel_y_offset = box.size.y * 1.0
 		elif height_level == 3:
@@ -129,18 +196,14 @@ func create_stain(target_local_pos: Vector3, layer_index: int = 0, animate: bool
 		mm.set_instance_transform(idx, t)
 		
 		var dist_from_center: float = Vector2(lx, lz).length()
-		var center_factor: float = clampf(dist_from_center / MAX_RADIUS, 0.0, 1.0)
+		var center_factor: float = clampf(dist_from_center / max_effective_radius, 0.0, 1.0)
 		# Центр — густая запекшаяся багровая кровь, края и брызги — яркая алая свежая кровь
-		var r: float = lerpf(0.55, 0.92, center_factor) + randf_range(-0.02, 0.02)
-		var g: float = lerpf(0.015, 0.045, center_factor)
-		var b: float = lerpf(0.020, 0.050, center_factor)
+		var r: float = lerpf(0.52, 0.92, center_factor) + randf_range(-0.02, 0.02)
+		var g: float = lerpf(0.012, 0.045, center_factor)
+		var b: float = lerpf(0.018, 0.050, center_factor)
 		mm.set_instance_color(idx, Color(r, g, b, 1.0))
 		
 		idx += 1
-		
-	# 4. АНИМАЦИЯ: Взрывной всплеск лужи и разлетающиеся воксельные капли
-	if animate:
-		_animate_splash(target_local_pos)
 
 ## Эффектная анимация шлепка лужи крови и фонтана брызг
 func _animate_splash(target_local_pos: Vector3) -> void:
@@ -186,5 +249,47 @@ func _spawn_flying_droplets() -> void:
 		
 		var side_z_tween = create_tween()
 		side_z_tween.tween_property(drop, "position:z", target_z, 0.38).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+## Эпичная анимация шлепка гигантской лужи крови от короля
+func _animate_mega_splash(target_local_pos: Vector3) -> void:
+	var final_y: float = target_local_pos.y
+	position.y = final_y + 0.22
+	scale = Vector3(0.05, 5.0, 0.05)
+	
+	var tw = create_tween().set_parallel(true)
+	tw.tween_property(self, "position:y", final_y, 0.28).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.tween_property(self, "scale", Vector3.ONE, 0.42).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	
+	_spawn_flying_droplets_mega()
+
+## Разлет массивных вокселей крови при гибели короля
+func _spawn_flying_droplets_mega() -> void:
+	var droplet_count: int = randi_range(36, 50)
+	var droplet_mesh = BoxMesh.new()
+	droplet_mesh.size = Vector3(0.035, 0.035, 0.035)
+	
+	for i in range(droplet_count):
+		var drop = MeshInstance3D.new()
+		drop.mesh = droplet_mesh
+		drop.material_override = get_blood_material()
+		add_child(drop)
+		
+		drop.position = Vector3(randf_range(-0.15, 0.15), 0.06, randf_range(-0.15, 0.15))
+		
+		var fly_angle: float = randf_range(0.0, TAU)
+		var fly_speed: float = randf_range(0.35, 0.85)
+		var target_x: float = cos(fly_angle) * fly_speed
+		var target_z: float = sin(fly_angle) * fly_speed
+		var peak_y: float = randf_range(0.30, 0.65)
+		
+		var d_tween = create_tween()
+		d_tween.tween_property(drop, "position:y", peak_y, 0.20).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		d_tween.tween_property(drop, "position:y", 0.005, 0.28).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		
+		var side_tween = create_tween()
+		side_tween.tween_property(drop, "position:x", target_x, 0.48).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		
+		var side_z_tween = create_tween()
+		side_z_tween.tween_property(drop, "position:z", target_z, 0.48).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
 

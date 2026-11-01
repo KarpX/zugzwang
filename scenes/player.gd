@@ -9,6 +9,14 @@ extends CharacterBody3D
 @onready var head: Node3D = $head
 @onready var camera: Camera3D = $head/Camera3D
 @onready var player_steps: AudioStreamPlayer3D = $PlayerSteps
+@onready var breath_player: AudioStreamPlayer3D = get_node_or_null("head/AudioStreamPlayer3D") as AudioStreamPlayer3D
+
+# Виньетка паники и тяжелое дыхание
+var _vignette_rect: ColorRect = null
+var _vignette_material: ShaderMaterial = null
+var _vignette_tween: Tween = null
+var _breath_tween: Tween = null
+var is_heavy_breathing: bool = false
 
 # Режимы управления
 var is_board_mode: bool = false
@@ -17,6 +25,7 @@ var can_walk: bool = true       # Перемещение WASD
 var is_near_table: bool = false
 
 var _cam_tween: Tween = null
+var _initial_cam_transform: Transform3D = Transform3D.IDENTITY
 var _radio_subtitle_label: Label = null
 var _radio_tween: Tween = null
 var _delayed_shake_tween: Tween = null
@@ -76,39 +85,39 @@ const RADIO_REPORTS_WHITE: Dictionary = {
 
 const RADIO_REPORTS_BLACK: Dictionary = {
 	"pawn": [
-		"«(Перехват) Первая цепь наступления противника рассеяна артиллерией.»",
-		"«(Перехват) Вражеская пехота залегла под пулеметным огнем.»",
-		"«(Перехват) Передовые группы противника несут критические потери на фланге.»",
-		"«(Перехват) Батальон врага остановлен на противотанковом рву.»",
-		"«(Перехват) Вражеская рота отступает, бросая тяжелое вооружение.»",
-		"«(Перехват) Вражеские позиции на переднем крае перепаханы гаубицами.»"
+		"«Первая цепь наступления противника рассеяна артиллерией.»",
+		"«Вражеская пехота залегла под пулеметным огнем.»",
+		"«Передовые группы противника несут критические потери на фланге.»",
+		"«Батальон врага остановлен на противотанковом рву.»",
+		"«Вражеская рота отступает, бросая тяжелое вооружение.»",
+		"«Вражеские позиции на переднем крае перепаханы гаубицами.»"
 	],
 	"knight": [
-		"«(Перехват) Авангард противника попал в огневой мешок на шоссе.»",
-		"«(Перехват) Колонна снабжения противника сожжена дотла.»",
-		"«(Перехват) Мобильная бронегруппа врага разбита в приграничном районе!»",
-		"«(Перехват) Моторизованный полк потерял связь со штабом направления!»",
-		"«(Перехват) Разведывательный батальон противника попал в окружение!»"
+		"«Авангард противника попал в огневой мешок на шоссе.»",
+		"«Колонна снабжения противника сожжена дотла.»",
+		"«Мобильная бронегруппа врага разбита в приграничном районе!»",
+		"«Моторизованный полк потерял связь со штабом направления!»",
+		"«Разведывательный батальон противника попал в окружение!»"
 	],
 	"bishop": [
-		"«(Перехват) Подавлена дальнобойная батарея противника на высоте 204.»",
-		"«(Перехват) Вражеский пункт управления огнем уничтожен.»",
-		"«(Перехват) Станция радиоэлектронной борьбы врага выведена из строя!»",
-		"«(Перехват) Тяжелые расчеты противника разбиты прямым попаданием!»"
+		"«Подавлена дальнобойная батарея противника на высоте 204.»",
+		"«Вражеский пункт управления огнем уничтожен.»",
+		"«Станция радиоэлектронной борьбы врага выведена из строя!»",
+		"«Тяжелые расчеты противника разбиты прямым попаданием!»"
 	],
 	"rook": [
-		"«(Перехват) ТЯЖЕЛЫЙ БРОНЕТАРАН ВРАГА РАЗОРВАН В КЛОЧЬЯ! ВЗРЫВ БОЕКОМПЛЕКТА!»",
-		"«(Перехват) Опорная крепость противника превращена в лунный кратер.»",
-		"«(Перехват) Главный рубеж обороны противника сокрушен! Провал фронта!»",
-		"«(Перехват) Железобетонный форт противника полностью разрушен авиаударом!»"
+		"«ТЯЖЕЛЫЙ БРОНЕТАРАН ВРАГА РАЗОРВАН В КЛОЧЬЯ! ВЗРЫВ БОЕКОМПЛЕКТА!»",
+		"«Опорная крепость противника превращена в лунный кратер.»",
+		"«Главный рубеж обороны противника сокрушен! Провал фронта!»",
+		"«Железобетонный форт противника полностью разрушен авиаударом!»"
 	],
 	"queen": [
-		"«(Перехват) ГЛАВНЫЙ БУНКЕР КОМАНДОВАНИЯ ВРАГА УНИЧТОЖЕН СТРАТЕГИЧЕСКИМ УДАРОМ!»",
-		"«(Перехват) У них паника в эфире! Вражеский фронт распадается на части!.. Но какой ценой?..»",
-		"«(Перехват) ГЕНЕРАЛЬНЫЙ ШТАБ ПРОТИВНИКА СТЕРТ С ЛИЦА ЗЕМЛИ! У НИХ ПОЛНЫЙ ХАОС!»"
+		"«ГЛАВНЫЙ БУНКЕР КОМАНДОВАНИЯ ВРАГА УНИЧТОЖЕН СТРАТЕГИЧЕСКИМ УДАРОМ!»",
+		"«У них паника в эфире! Вражеский фронт распадается на части!.. Но какой ценой?..»",
+		"«ГЕНЕРАЛЬНЫЙ ШТАБ ПРОТИВНИКА СТЕРТ С ЛИЦА ЗЕМЛИ! У НИХ ПОЛНЫЙ ХАОС!»"
 	],
 	"king": [
-		"«(Перехват) ВСЕ ЧАСТОТЫ ПРОТИВНИКА ЗАМОЛКЛИ. ВРАГ УНИЧТОЖЕН. МИР СГОРЕЛ...»"
+		"«ВСЕ ЧАСТОТЫ ПРОТИВНИКА ЗАМОЛКЛИ. ВРАГ УНИЧТОЖЕН. МИР СГОРЕЛ...»"
 	]
 }
 
@@ -125,6 +134,9 @@ func _get_event_bus() -> Node:
 	return get_node_or_null("/root/EventBus")
 
 func _ready() -> void:
+	add_to_group("player")
+	if camera != null:
+		_initial_cam_transform = camera.transform
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	_setup_hud()
 	_find_chess_board()
@@ -140,6 +152,14 @@ func _ready() -> void:
 			bus.seismic_shock_triggered.connect(_on_seismic_shock_triggered)
 		if bus.has_signal("outside_stage_changed"):
 			bus.outside_stage_changed.connect(_on_outside_stage_changed)
+		if bus.has_signal("radio_transmission_started"):
+			bus.radio_transmission_started.connect(_on_radio_transmission_started)
+		if bus.has_signal("game_over"):
+			bus.game_over.connect(_on_game_over)
+		if bus.has_signal("game_reset"):
+			bus.game_reset.connect(_on_game_reset)
+			
+	_init_breath_player()
 
 func _setup_audio_listener() -> void:
 	if camera != null and camera.get_node_or_null("AudioListener3D") == null:
@@ -159,6 +179,24 @@ func _setup_hud() -> void:
 	root_ctrl.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	root_ctrl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	canvas.add_child(root_ctrl)
+
+	# Полноэкранная виньетка паники и тяжелого дыхания
+	_vignette_rect = ColorRect.new()
+	_vignette_rect.name = "PanicVignette"
+	_vignette_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_vignette_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_vignette_rect.color = Color(1.0, 1.0, 1.0, 1.0)
+	
+	if ResourceLoader.exists("res://shaders/vignette.gdshader"):
+		var vignette_shader = load("res://shaders/vignette.gdshader")
+		if vignette_shader is Shader:
+			_vignette_material = ShaderMaterial.new()
+			_vignette_material.shader = vignette_shader
+			_vignette_material.set_shader_parameter("vignette_opacity", 0.0)
+			_vignette_material.set_shader_parameter("vignette_intensity", 1.15)
+			_vignette_rect.material = _vignette_material
+			
+	root_ctrl.add_child(_vignette_rect)
 
 	# Радио-сводка военных потерь (субтитры внизу экрана с контрастной обводкой)
 	_radio_subtitle_label = Label.new()
@@ -254,6 +292,9 @@ func show_radio_report(piece_type: String, is_white: bool = true) -> void:
 	var queue: Array = unused_dict[piece_type]
 	var text_line: String = queue.pop_back()
 	
+	if not is_white and not text_line.begins_with("«(Перехват)"):
+		text_line = "«(Перехват) " + text_line.trim_prefix("«")
+	
 	# Цветовая кодировка степени тревоги в зависимости от ранга фигуры и стороны
 	if _radio_subtitle_label.label_settings != null:
 		if is_white:
@@ -278,7 +319,7 @@ func show_radio_report(piece_type: String, is_white: bool = true) -> void:
 				_:
 					_radio_subtitle_label.label_settings.font_color = Color(0.50, 0.95, 0.65, 1.0)
 			
-	_display_radio_text(text_line)
+	_display_radio_text(text_line, is_white)
 
 ## Прямой вывод радиоперехвата эфира противника
 func show_enemy_radio_intercept(piece_type: String) -> void:
@@ -290,23 +331,45 @@ func show_custom_radio_message(msg: String, color: Color = Color(0.50, 0.95, 0.6
 		return
 	if _radio_subtitle_label.label_settings != null:
 		_radio_subtitle_label.label_settings.font_color = color
-	_display_radio_text(msg)
+	_display_radio_text(msg, false)
 
-func _display_radio_text(text_line: String) -> void:
+func _display_radio_text(text_line: String, is_white: bool = true) -> void:
 	_radio_subtitle_label.text = text_line
 	_radio_subtitle_label.visible_ratio = 1.0
-	_radio_subtitle_label.modulate.a = 0.15
+	_radio_subtitle_label.modulate.a = 0.25
+	
+	var bus = _get_event_bus()
+	if bus and bus.has_signal("radio_phrase_triggered"):
+		bus.radio_phrase_triggered.emit(text_line, is_white)
+	else:
+		_start_subtitle_animation(text_line, 3.5)
+
+func _on_radio_transmission_started(text_line: String, _stream: AudioStream, duration: float) -> void:
+	_start_subtitle_animation(text_line, duration)
+
+func _start_subtitle_animation(text_line: String, anim_duration: float) -> void:
+	if _radio_subtitle_label == null:
+		return
+	_radio_subtitle_label.text = text_line
+	_radio_subtitle_label.visible_ratio = 0.0
+	_radio_subtitle_label.modulate.a = 0.25
 	
 	if _radio_tween and _radio_tween.is_valid():
 		_radio_tween.kill()
 		
-	_radio_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	# Быстрое и надежное проявление текста
-	_radio_tween.tween_property(_radio_subtitle_label, "modulate:a", 1.0, 0.20)
-	# Время удержания на экране
-	_radio_tween.tween_interval(4.5)
-	# Плавное угасание в темноту
-	_radio_tween.tween_property(_radio_subtitle_label, "modulate:a", 0.0, 0.8)
+	_radio_tween = create_tween().set_trans(Tween.TRANS_LINEAR)
+	# 1. Быстрое проявление подложки текста
+	_radio_tween.tween_property(_radio_subtitle_label, "modulate:a", 1.0, 0.10)
+	
+	# 2. Анимация печати текста — ровно пока идет эта печать, играет шум радио
+	_radio_tween.parallel().tween_property(_radio_subtitle_label, "visible_ratio", 1.0, anim_duration)
+	
+	# 3. Как только анимация печати прекращается — звук радио затихает в RadioController,
+	# а полностью напечатанный текст остаётся для чтения еще на 2.5 секунды
+	_radio_tween.tween_interval(2.5)
+	
+	# 4. Плавное затухание текста
+	_radio_tween.tween_property(_radio_subtitle_label, "modulate:a", 0.0, 0.60)
 
 ## Обработчик взятия фигуры (сотрясение комнаты и радио-сводка потерь)
 func _on_piece_captured(piece_type: String, is_white: bool) -> void:
@@ -322,6 +385,8 @@ func _on_piece_captured(piece_type: String, is_white: bool) -> void:
 			"queen":
 				# Катастрофа при потере Ферзя: мощнейшая тряска (максимальная травма, долгое затухание, смещение 15 см)
 				apply_camera_shake(1.0, 0.85, 0.15)
+				# Страшное событие: потеря королевы включает тяжелое дыхание и виньетку
+				start_heavy_breathing(12.0, 0.80)
 			_:
 				apply_camera_shake(0.30, 2.8, 0.045)
 		show_radio_report(piece_key, true)
@@ -341,10 +406,10 @@ func _handle_enemy_piece_loss(piece_key: String) -> void:
 		# Гибель вражеского Ферзя — ключевое стратегическое событие партии, всегда транслируется в эфир
 		show_radio_report("queen", false)
 	elif current_out_stage >= 4:
-		show_custom_radio_message("«(Перехват) В радиоэфире мертвая тишина. Больше некому выходить на связь.»", Color(0.70, 0.70, 0.75, 1.0))
+		show_custom_radio_message("« В радиоэфире мертвая тишина. Больше некому выходить на связь.»", Color(0.70, 0.70, 0.75, 1.0))
 	elif current_out_stage >= 3:
 		# На стадии III человеческие голоса исчезают, в эфире автоматическая номерная станция
-		show_custom_radio_message("«(Перехват) [ЭФИР 4625 кГц] ... 74 102 СЛОВО 89 21 ... МОНОТОННЫЙ ЗУММЕР ...»", Color(0.85, 0.85, 0.95, 1.0))
+		show_custom_radio_message("« [ЭФИР 4625 кГц] ... 74 102 СЛОВО 89 21 ... МОНОТОННЫЙ ЗУММЕР ...»", Color(0.85, 0.85, 0.95, 1.0))
 	else:
 		show_radio_report(piece_key, false)
 
@@ -381,13 +446,99 @@ func _on_seismic_shock_triggered(intensity: float, is_subterranean: bool) -> voi
 func _on_outside_stage_changed(stage: int, _black_score: int) -> void:
 	match stage:
 		3:
-			show_custom_radio_message("«(Перехват) [ЭФИР 4625 кГц] ... 74 102 СЛОВО 89 21 ... МОНОТОННЫЙ ЗУММЕР ...»", Color(0.85, 0.85, 0.95, 1.0))
+			show_custom_radio_message("« [ЭФИР 4625 кГц] ... 74 102 СЛОВО 89 21 ... МОНОТОННЫЙ ЗУММЕР ...»", Color(0.85, 0.85, 0.95, 1.0))
 		4:
-			show_custom_radio_message("«(Перехват) В радиоэфире мертвая тишина. Больше некому выходить на связь.»", Color(0.70, 0.70, 0.75, 1.0))
+			show_custom_radio_message("« В радиоэфире мертвая тишина. Больше некому выходить на связь.»", Color(0.70, 0.70, 0.75, 1.0))
 
 ## Обработчик стука в дверь бункера
 func _on_door_knock_triggered(knock_level: int) -> void:
 	apply_camera_shake(0.35 * float(knock_level), 2.2, 0.05 * float(knock_level))
+
+## Реакция на исход партии (страшные события: поражение Белых)
+func _on_game_over(winner: String) -> void:
+	var win_key: String = winner.to_lower()
+	if win_key == "black" or win_key == "breach":
+		# Проигрыш Белых (мат или выбитая дверь бункера) — паника, тяжелое дыхание и глубокая виньетка
+		start_heavy_breathing(-1.0, 0.85)
+
+func _on_game_reset(_playthrough: int) -> void:
+	stop_heavy_breathing(0.0)
+
+func _init_breath_player() -> void:
+	if breath_player == null:
+		breath_player = get_node_or_null("head/AudioStreamPlayer3D") as AudioStreamPlayer3D
+	if breath_player == null and head != null:
+		breath_player = AudioStreamPlayer3D.new()
+		breath_player.name = "AudioStreamPlayer3D"
+		breath_player.unit_size = 8.0
+		breath_player.max_distance = 15.0
+		head.add_child(breath_player)
+	if breath_player:
+		if breath_player.stream == null and ResourceLoader.exists("res://assets/sounds/breath.ogg"):
+			breath_player.stream = load("res://assets/sounds/breath.ogg")
+		breath_player.bus = &"Sound"
+
+## Запуск тяжелого дыхания и виньетки при страшных событиях (потеря королевы, проигрыш белых)
+func start_heavy_breathing(duration: float = 12.0, target_opacity: float = 0.80) -> void:
+	is_heavy_breathing = true
+	_init_breath_player()
+	
+	# 1. Запуск звука дыхания в голове игрока
+	if breath_player:
+		if not breath_player.playing:
+			breath_player.volume_db = -18.0
+			breath_player.play()
+		else:
+			if _breath_tween and _breath_tween.is_valid():
+				_breath_tween.kill()
+			_breath_tween = create_tween()
+			_breath_tween.tween_property(breath_player, "volume_db", -1.0, 0.25)
+			
+	# 2. Активация виньетки паники
+	if _vignette_material:
+		if _vignette_tween and _vignette_tween.is_valid():
+			_vignette_tween.kill()
+		_vignette_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		var cur_op: float = float(_vignette_material.get_shader_parameter("vignette_opacity"))
+		# Плавное нарастание виньетки в такт панической реакции
+		_vignette_tween.tween_method(
+			func(val: float): _vignette_material.set_shader_parameter("vignette_opacity", val),
+			cur_op,
+			target_opacity,
+			1.2
+		)
+		if duration > 0.0:
+			_vignette_tween.tween_interval(duration)
+			_vignette_tween.tween_callback(func(): stop_heavy_breathing(0.25))
+
+## Остановка тяжелого дыхания и плавное исчезновение виньетки
+func stop_heavy_breathing(fade_time: float = 1.5) -> void:
+	is_heavy_breathing = false
+	if _vignette_tween and _vignette_tween.is_valid():
+		_vignette_tween.kill()
+		
+	if _vignette_material:
+		var cur_op: float = float(_vignette_material.get_shader_parameter("vignette_opacity"))
+		if cur_op > 0.0:
+			_vignette_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+			_vignette_tween.tween_method(
+				func(val: float): _vignette_material.set_shader_parameter("vignette_opacity", val),
+				cur_op,
+				0.0,
+				fade_time
+			)
+			
+	if breath_player and breath_player.playing:
+		if _breath_tween and _breath_tween.is_valid():
+			_breath_tween.kill()
+		_breath_tween = create_tween()
+		_breath_tween.tween_property(breath_player, "volume_db", -35.0, fade_time)
+		_breath_tween.tween_callback(breath_player.stop)
+
+func get_vignette_opacity() -> float:
+	if _vignette_material:
+		return float(_vignette_material.get_shader_parameter("vignette_opacity"))
+	return 0.0
 
 ## Обновление тряски камеры со спадом (только h_offset и v_offset в экранном пространстве, без изменения осей вращения)
 func _update_camera_shake(delta: float) -> void:
@@ -548,13 +699,11 @@ func exit_board_mode() -> void:
 		if _cam_tween and _cam_tween.is_valid():
 			_cam_tween.kill()
 		_cam_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
-		_cam_tween.tween_property(camera, "transform", Transform3D.IDENTITY, 0.65)
+		_cam_tween.tween_property(camera, "transform", _initial_cam_transform, 0.65)
 		_cam_tween.chain().tween_callback(func():
 			if camera != null:
-				camera.transform = Transform3D.IDENTITY
+				camera.transform = _initial_cam_transform
 		)
-		_cam_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
-		_cam_tween.tween_property(camera, "transform", Transform3D.IDENTITY, 0.65)
 	
 	var bus = _get_event_bus()
 	if bus:

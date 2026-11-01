@@ -1,9 +1,8 @@
-[gd_resource type="AudioBusLayout" load_steps=3 format=3 uid="uid://cygyeg5bxekdb"]
+[gd_resource type="AudioBusLayout" format=3 uid="uid://cygyeg5bxekdb"]
 
 [sub_resource type="AudioEffectLowPassFilter" id="AudioEffectLowPassFilter_outside"]
 resource_name = "LowPassFilter"
 cutoff_hz = 1000.0
-resonance = 0.5
 
 [sub_resource type="AudioEffectReverb" id="AudioEffectReverb_outside"]
 resource_name = "Reverb"
@@ -12,6 +11,23 @@ damping = 0.6
 spread = 0.5
 dry = 0.7
 wet = 0.4
+
+[sub_resource type="AudioEffectBandPassFilter" id="AudioEffectBandPassFilter_j3pel"]
+resource_name = "BandPassFilter"
+cutoff_hz = 1771.0
+resonance = 0.6
+
+[sub_resource type="AudioEffectDistortion" id="AudioEffectDistortion_j3pel"]
+resource_name = "Distortion"
+drive = 0.23
+post_gain = -3.65
+
+[sub_resource type="AudioEffectCompressor" id="AudioEffectCompressor_j3pel"]
+resource_name = "Compressor"
+threshold = -17.5
+ratio = 6.1
+attack_us = 2000.0
+release_ms = 146.0
 
 [resource]
 bus/1/name = &"Sound"
@@ -36,3 +52,21 @@ bus/3/effect/0/effect = SubResource("AudioEffectLowPassFilter_outside")
 bus/3/effect/0/enabled = true
 bus/3/effect/1/effect = SubResource("AudioEffectReverb_outside")
 bus/3/effect/1/enabled = true
+bus/4/name = &"Radio"
+bus/4/solo = false
+bus/4/mute = false
+bus/4/bypass_fx = false
+bus/4/volume_db = 0.0
+bus/4/send = &"Master"
+bus/4/effect/0/effect = SubResource("AudioEffectBandPassFilter_j3pel")
+bus/4/effect/0/enabled = true
+bus/4/effect/1/effect = SubResource("AudioEffectDistortion_j3pel")
+bus/4/effect/1/enabled = true
+bus/4/effect/2/effect = SubResource("AudioEffectCompressor_j3pel")
+bus/4/effect/2/enabled = true
+bus/5/name = &"Music"
+bus/5/solo = false
+bus/5/mute = false
+bus/5/bypass_fx = false
+bus/5/volume_db = 0.0
+bus/5/send = &"Master"

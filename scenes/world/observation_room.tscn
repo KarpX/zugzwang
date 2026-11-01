@@ -1,0 +1,208 @@
+[gd_scene format=3 uid="uid://c6y78m5xa1a3k"]
+
+[ext_resource type="Script" uid="uid://cxdlckkq165k8" path="res://scripts/world/observation_monitor.gd" id="1_monitor"]
+[ext_resource type="AudioStream" uid="uid://d35f8fhkj4urh" path="res://assets/sounds/bulb_ambient.ogg" id="2_ienag"]
+[ext_resource type="AudioStream" uid="uid://bl1ix3odo6k4e" path="res://assets/sounds/its end.ogg" id="2_v34ih"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_floor"]
+albedo_color = Color(0.08, 0.08, 0.09, 1)
+roughness = 0.9
+
+[sub_resource type="BoxMesh" id="BoxMesh_floor"]
+material = SubResource("StandardMaterial3D_floor")
+size = Vector3(10, 0.4, 12)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_floor"]
+size = Vector3(10, 0.4, 12)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_wall"]
+albedo_color = Color(0.12, 0.13, 0.14, 1)
+roughness = 0.95
+
+[sub_resource type="BoxMesh" id="BoxMesh_wall_side"]
+material = SubResource("StandardMaterial3D_wall")
+size = Vector3(0.5, 15.1883545, 12)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_wall_side"]
+size = Vector3(0.5, 14.679749, 12)
+
+[sub_resource type="BoxMesh" id="BoxMesh_wall_back"]
+material = SubResource("StandardMaterial3D_wall")
+size = Vector3(10, 12.548706, 0.5)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_wall_back"]
+size = Vector3(10, 12.418823, 0.5)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_desk"]
+albedo_color = Color(0.15, 0.16, 0.17, 1)
+metallic = 0.4
+roughness = 0.6
+
+[sub_resource type="BoxMesh" id="BoxMesh_desk"]
+material = SubResource("StandardMaterial3D_desk")
+size = Vector3(3, 6.5117784, 1.8097168)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_desk"]
+size = Vector3(3, 7.4874024, 1.8313477)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_crt_body"]
+albedo_color = Color(0.06, 0.07, 0.08, 1)
+roughness = 0.8
+
+[sub_resource type="BoxMesh" id="BoxMesh_crt_body"]
+material = SubResource("StandardMaterial3D_crt_body")
+size = Vector3(1.6, 1.3, 1.2)
+
+[sub_resource type="QuadMesh" id="QuadMesh_screen"]
+size = Vector2(1.3, 1)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_trigger"]
+size = Vector3(3.5, 4, 1.5)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_blocker"]
+size = Vector3(4, 6, 0.6)
+
+[node name="ObservationRoom" type="Node3D" unique_id=1759792024]
+
+[node name="RoomGeometry" type="StaticBody3D" parent="." unique_id=1781475544]
+
+[node name="Floor" type="MeshInstance3D" parent="RoomGeometry" unique_id=1910847351]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, -0.2, -6)
+mesh = SubResource("BoxMesh_floor")
+
+[node name="FloorCol" type="CollisionShape3D" parent="RoomGeometry" unique_id=1602449816]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, -0.2, -6)
+shape = SubResource("BoxShape3D_floor")
+
+[node name="Ceiling" type="MeshInstance3D" parent="RoomGeometry" unique_id=95216285]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 12.5, -6)
+mesh = SubResource("BoxMesh_floor")
+
+[node name="CeilingCol" type="CollisionShape3D" parent="RoomGeometry" unique_id=260902083]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 12.467989, -6)
+shape = SubResource("BoxShape3D_floor")
+
+[node name="WallLeft" type="MeshInstance3D" parent="RoomGeometry" unique_id=1533882144]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11, 6.3864746, -6)
+mesh = SubResource("BoxMesh_wall_side")
+
+[node name="WallLeftCol" type="CollisionShape3D" parent="RoomGeometry" unique_id=929942389]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11, 6.1651, -6)
+shape = SubResource("BoxShape3D_wall_side")
+
+[node name="WallRight" type="MeshInstance3D" parent="RoomGeometry" unique_id=1370497819]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 21, 5.2077026, -6)
+mesh = SubResource("BoxMesh_wall_side")
+
+[node name="WallRightCol" type="CollisionShape3D" parent="RoomGeometry" unique_id=815074358]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 21, 5.174774, -6)
+shape = SubResource("BoxShape3D_wall_side")
+
+[node name="WallBack" type="MeshInstance3D" parent="RoomGeometry" unique_id=851784145]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 6.274353, -12)
+mesh = SubResource("BoxMesh_wall_back")
+
+[node name="WallBackCol" type="CollisionShape3D" parent="RoomGeometry" unique_id=509749145]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 6.2094116, -12)
+shape = SubResource("BoxShape3D_wall_back")
+
+[node name="ConsoleDesk" type="StaticBody3D" parent="." unique_id=619701852]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 0.9, -7.5)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="ConsoleDesk" unique_id=788863766]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.3558898, -0.2048583)
+mesh = SubResource("BoxMesh_desk")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="ConsoleDesk" unique_id=1118490774]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.843701, -0.21567392)
+shape = SubResource("BoxShape3D_desk")
+
+[node name="CRTMonitor" type="Node3D" parent="." unique_id=570274037 node_paths=PackedStringArray("screen_mesh", "viewport")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 7.1045628, -7.4)
+script = ExtResource("1_monitor")
+screen_mesh = NodePath("ScreenMesh")
+viewport = NodePath("SubViewport")
+
+[node name="MonitorBody" type="MeshInstance3D" parent="CRTMonitor" unique_id=1897775698]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.4)
+mesh = SubResource("BoxMesh_crt_body")
+
+[node name="ScreenMesh" type="MeshInstance3D" parent="CRTMonitor" unique_id=981421438]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.21)
+mesh = SubResource("QuadMesh_screen")
+
+[node name="MonitorGlow" type="SpotLight3D" parent="CRTMonitor" unique_id=1054933020]
+transform = Transform3D(1, 0, 0, 0, -1, 8.742278e-08, 0, -8.742278e-08, -1, 0, 0, 0.5)
+light_color = Color(0.2, 0.9, 0.5, 1)
+light_energy = 2.2
+spot_range = 6.6378765
+spot_angle = 60.0
+
+[node name="SubViewport" type="SubViewport" parent="CRTMonitor" unique_id=242250203]
+disable_3d = true
+size = Vector2i(1040, 800)
+render_target_update_mode = 3
+
+[node name="MonitorUI" type="ColorRect" parent="CRTMonitor/SubViewport" unique_id=1045990893]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.015, 0.03, 0.02, 1)
+
+[node name="Margin" type="MarginContainer" parent="CRTMonitor/SubViewport/MonitorUI" unique_id=1598290638]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 36
+theme_override_constants/margin_top = 32
+theme_override_constants/margin_right = 36
+theme_override_constants/margin_bottom = 32
+
+[node name="TerminalText" type="RichTextLabel" parent="CRTMonitor/SubViewport/MonitorUI/Margin" unique_id=965861976]
+layout_mode = 2
+theme_override_colors/default_color = Color(0.27, 0.96, 0.46, 1)
+theme_override_constants/line_separation = 6
+theme_override_font_sizes/normal_font_size = 26
+bbcode_enabled = true
+text = "> ТЕРМИНАЛ СВЯЗИ УЗЛА «ZUGZWANG-0»
+> ВХОД ВЫПОЛНЕН: ОБЪЕКТ-0
+
+> ДЛЯ ПРОДОЛЖЕНИЯ НАЖМИТЕ [ E ] _"
+scroll_following = true
+
+[node name="AudioStreamPlayer3D" type="AudioStreamPlayer3D" parent="CRTMonitor" unique_id=1158333965]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.59723806)
+stream = ExtResource("2_ienag")
+volume_db = -15.0
+unit_size = 2.0
+max_db = 1.0
+pitch_scale = 0.7
+autoplay = true
+max_distance = 8.0
+bus = &"Ambient"
+
+[node name="EntryTrigger" type="Area3D" parent="." unique_id=458047154]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 2, -2.5)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="EntryTrigger" unique_id=1537122101]
+shape = SubResource("BoxShape3D_trigger")
+
+[node name="DoorBlocker" type="StaticBody3D" parent="." unique_id=1768834384]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 3, -0.2)
+collision_layer = 0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="DoorBlocker" unique_id=135599168]
+shape = SubResource("BoxShape3D_blocker")
+disabled = true
+
+[node name="FinalMusicPlayer" type="AudioStreamPlayer3D" parent="." unique_id=1315882517]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.000254, 9.098477, -5.4956656)
+stream = ExtResource("2_v34ih")
+volume_db = -10.0
+max_distance = 200.0
+bus = &"Music"

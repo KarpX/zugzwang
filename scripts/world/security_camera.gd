@@ -33,6 +33,14 @@ extends Node3D
 var _sound_timer: float = 0.0
 var _twitch_quat: Quaternion = Quaternion.IDENTITY
 var _twitch_tween: Tween = null
+var _not_follow = false
+
+func toggle_follow(value = null):
+	if value:
+		_not_follow = value
+		return
+	
+	_not_follow = not(_not_follow)
 
 func _get_event_bus() -> Node:
 	if not is_inside_tree():
@@ -114,7 +122,7 @@ func _resolve_target() -> void:
 			target = root_player as Node3D
 
 func _process(delta: float) -> void:
-	if not is_inside_tree():
+	if not is_inside_tree() or _not_follow:
 		return
 
 	if not target or not is_instance_valid(target):

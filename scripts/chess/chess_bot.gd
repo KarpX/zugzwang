@@ -971,7 +971,7 @@ static func choose_best_move(
 	var black_king_pos = find_king(board, false)
 	var in_check: bool = is_in_check(board, false)
 	
-	if playthrough == 2 and not in_check and scored_root_moves.size() > 1:
+	if playthrough >= 2 and not in_check and scored_root_moves.size() > 1:
 		scored_root_moves.sort_custom(func(a, b): return a["score"] > b["score"])
 		var top_score: float = scored_root_moves[0]["score"]
 		
